@@ -11,16 +11,16 @@ import {
   Save,
   AlertTriangle,
   CreditCard,
-  Building,
   RefreshCw,
-  UserCheck,
-  ChevronRight,
-  ChevronLeft,
-  Wifi,
-  Sparkles,
-  DollarSign
+  MessageCircle,
+  Check,
+  Zap,
+  DollarSign,
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { format, formatDistanceToNow, isBefore } from 'date-fns';
 
 const LeadQueueView = () => {
   const queryClient = useQueryClient();
@@ -108,6 +108,19 @@ const LeadQueueView = () => {
     return `${m}:${s}`;
   };
 
+  // Helper for E.164 phone formatting
+  const ensureE164 = (phone) => {
+    if (!phone) return '';
+    const raw = String(phone).trim();
+    if (raw.startsWith('+')) return `+${raw.replace(/[^0-9]/g, '')}`;
+    const digits = raw.replace(/[^0-9]/g, '');
+    return `+91${digits}`;
+  };
+
+  const getWhatsAppNumber = (phone) => {
+    return ensureE164(phone).replace(/\D/g, '');
+  };
+
   // One-Click Calling Handler
   const handleStartCall = async (phoneToCall) => {
     if (!currentLead || callState !== 'idle') return;
@@ -128,7 +141,6 @@ const LeadQueueView = () => {
         setCallState('ringing');
         toast.success(`Dialing ${targetPhone}...`);
         
-        // Auto transition to connected state after 1.5s simulation
         setTimeout(() => {
           setCallState('connected');
         }, 1500);
@@ -139,7 +151,7 @@ const LeadQueueView = () => {
     }
   };
 
-  // End Call Handler (Calculates authoritative talk time)
+  // End Call Handler
   const handleEndCall = async (dispositionOutcome = 'completed') => {
     if (!activeCallId) {
       setCallState('idle');
@@ -167,7 +179,6 @@ const LeadQueueView = () => {
     setSaving(true);
     setSaveError(null);
 
-    // Validate follow-up date requirement for follow-up status/dispositions
     const requiresFollowUp = status === 'follow-up' || disposition.toLowerCase().includes('follow-up') || disposition.toLowerCase().includes('callback');
     if (requiresFollowUp && !nextFollowUpAt) {
       const errMsg = 'Please specify Next Follow-up Date & Time before saving.';
@@ -243,390 +254,419 @@ const LeadQueueView = () => {
     }
   };
 
+  const isMissedFollowUp = (lead) => {
+    if (!lead?.nextFollowUpAt) return false;
+    return isBefore(new Date(lead.nextFollowUpAt), new Date());
+  };
+
   if (loading && !queue.length) {
     return (
-      <div className="p-12 text-center text-gray-400 animate-pulse font-medium">
-        Loading BDE Working Queue...
+      <div className="p-8 text-center text-gray-400 animate-pulse font-medium">
+        Loading Working Queue...
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-16">
-      {/* 1. Header & Live Compact Bucket Counters */}
-      <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+    <div className="space-y-4 max-w-6xl mx-auto pb-12">
+      {/* 1. COMPACT OPERATIONAL HEADER */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-black text-gray-900 tracking-tight uppercase flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary-600" />
+              WORKING QUEUE
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              Synced {lastRefreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          </div>
+
+          <button
+            onClick={() => refetchQueue()}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Refresh
+          </button>
+        </div>
+
+        {/* Operational Counter Chips */}
+        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-100">
+          <button
+            onClick={() => { setActiveBucket('missed-followup'); setCurrentIndex(0); }}
+            className={`px-3 py-2 rounded-lg text-left transition-all border flex items-center justify-between ${
+              activeBucket === 'missed-followup'
+                ? 'bg-red-50 border-red-500 text-red-900 font-bold shadow-sm'
+                : 'bg-gray-50/80 border-gray-200 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <span className="text-xs font-semibold">Missed</span>
+            <span className="text-sm font-black text-red-600">{summary.missedCount}</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveBucket('followup-today'); setCurrentIndex(0); }}
+            className={`px-3 py-2 rounded-lg text-left transition-all border flex items-center justify-between ${
+              activeBucket === 'followup-today'
+                ? 'bg-orange-50 border-orange-500 text-orange-900 font-bold shadow-sm'
+                : 'bg-gray-50/80 border-gray-200 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <span className="text-xs font-semibold">Due Today</span>
+            <span className="text-sm font-black text-orange-600">{summary.todayCount}</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveBucket('fresh'); setCurrentIndex(0); }}
+            className={`px-3 py-2 rounded-lg text-left transition-all border flex items-center justify-between ${
+              activeBucket === 'fresh'
+                ? 'bg-blue-50 border-blue-500 text-blue-900 font-bold shadow-sm'
+                : 'bg-gray-50/80 border-gray-200 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <span className="text-xs font-semibold">New</span>
+            <span className="text-sm font-black text-blue-600">{summary.freshCount}</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveBucket('all'); setCurrentIndex(0); }}
+            className={`px-3 py-2 rounded-lg text-left transition-all border flex items-center justify-between ${
+              activeBucket === 'all'
+                ? 'bg-gray-900 border-gray-900 text-white font-bold shadow-sm'
+                : 'bg-gray-50/80 border-gray-200 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <span className="text-xs font-semibold">Total</span>
+            <span className="text-sm font-black">{summary.totalQueueCount}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. COMPACT EMPTY STATE (WHEN QUEUE COMPLETE) */}
+      {!currentLead ? (
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm text-center max-w-md mx-auto my-6 space-y-3">
+          <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+            <CheckCircle className="h-6 w-6" />
+          </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Working Queue</h1>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">
-                <Wifi className="h-3 w-3 animate-pulse text-green-600" />
-                Live API
-              </span>
-            </div>
-            <p className="text-xs md:text-sm text-gray-500 mt-0.5">High-frequency BDE Workspace • Auto-synced {lastRefreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
+            <h3 className="text-base font-bold text-gray-900">✓ Queue Complete</h3>
+            <p className="text-xs text-gray-500 mt-1">All eligible leads in the <strong>{activeBucket}</strong> queue have been processed.</p>
           </div>
           <button
-            onClick={() => fetchQueue(false)}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors self-start md:self-auto border border-gray-200"
+            onClick={() => { setActiveBucket('all'); refetchQueue(); }}
+            className="px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-lg transition-colors inline-flex items-center gap-1.5"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Refresh Queue
           </button>
         </div>
-
-        {/* Operational Bucket Tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 border-t pt-3">
-          <button
-            onClick={() => { setActiveBucket('all'); setCurrentIndex(0); }}
-            className={`p-3 rounded-xl text-center border transition-all ${activeBucket === 'all' ? 'bg-primary-50 border-primary-600 text-primary-800 font-bold shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
-          >
-            <div className="text-xs font-medium">All Queue</div>
-            <div className="text-xl font-extrabold mt-0.5">{summary.totalQueueCount}</div>
-          </button>
-
-          <button
-            onClick={() => { setActiveBucket('missed-followup'); setCurrentIndex(0); }}
-            className={`p-3 rounded-xl text-center border transition-all relative ${activeBucket === 'missed-followup' ? 'bg-red-50 border-red-600 text-red-800 font-bold shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
-          >
-            {summary.missedCount > 0 && (
-              <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[10px] font-black bg-red-600 text-white rounded-full animate-bounce">MISSED</span>
-            )}
-            <div className="text-xs font-medium">Missed Follow-ups</div>
-            <div className="text-xl font-extrabold text-red-600 mt-0.5">{summary.missedCount}</div>
-          </button>
-
-          <button
-            onClick={() => { setActiveBucket('followup-today'); setCurrentIndex(0); }}
-            className={`p-3 rounded-xl text-center border transition-all ${activeBucket === 'followup-today' ? 'bg-orange-50 border-orange-600 text-orange-800 font-bold shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
-          >
-            <div className="text-xs font-medium">Due Today</div>
-            <div className="text-xl font-extrabold text-orange-600 mt-0.5">{summary.todayCount}</div>
-          </button>
-
-          <button
-            onClick={() => { setActiveBucket('fresh'); setCurrentIndex(0); }}
-            className={`p-3 rounded-xl text-center border transition-all ${activeBucket === 'fresh' ? 'bg-green-50 border-green-600 text-green-800 font-bold shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
-          >
-            <div className="text-xs font-medium">New / Reassigned</div>
-            <div className="text-xl font-extrabold text-green-600 mt-0.5">{summary.freshCount}</div>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Main Lead Workspace */}
-      {!currentLead ? (
-        <div className="bg-white p-12 rounded-2xl shadow-sm border border-gray-200 text-center space-y-4">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
-          <h2 className="text-2xl font-bold text-gray-900">Queue Processing Complete!</h2>
-          <p className="text-gray-500 text-sm max-w-md mx-auto">You have processed all eligible leads in the <strong>{activeBucket.toUpperCase()}</strong> queue.</p>
-          <button
-            onClick={() => { setActiveBucket('all'); fetchQueue(false); }}
-            className="btn-primary text-sm px-6 py-2.5 rounded-xl font-bold inline-flex items-center gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Switch to All Queue
-          </button>
-        </div>
       ) : (
-        <div className="space-y-6">
-          {/* Navigation bar with compact lead position */}
-          <div className="flex items-center justify-between bg-white px-5 py-3 rounded-xl border border-gray-200 shadow-sm">
+        /* 3. ACTIVE LEAD WORKSPACE (TWO-COLUMN DESKTOP LAYOUT) */
+        <div className="space-y-4">
+          {/* Queue Progress Counter */}
+          <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Queue Position:</span>
-              <span className="px-2.5 py-1 bg-primary-100 text-primary-800 rounded-lg text-xs font-black">
+              <span className="text-gray-400 uppercase tracking-wider font-bold">Progress:</span>
+              <span className="px-2.5 py-0.5 rounded-md bg-gray-100 text-gray-900 font-bold">
                 Lead {currentIndex + 1} of {queue.length}
               </span>
             </div>
-
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <button
                 disabled={currentIndex === 0}
                 onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
-                className="p-2 rounded-lg border text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                title="Previous Lead"
+                className="px-2.5 py-1 border rounded-md hover:bg-gray-50 disabled:opacity-30 text-xs font-bold"
               >
-                <ChevronLeft className="h-4 w-4" />
+                ← Prev
               </button>
               <button
                 disabled={currentIndex >= queue.length - 1}
                 onClick={() => setCurrentIndex(prev => Math.min(queue.length - 1, prev + 1))}
-                className="p-2 rounded-lg border text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                title="Next Lead"
+                className="px-2.5 py-1 border rounded-md hover:bg-gray-50 disabled:opacity-30 text-xs font-bold"
               >
-                <ChevronRight className="h-4 w-4" />
+                Next →
               </button>
             </div>
           </div>
 
-          {/* Focused Student Lead Workspace Card */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b pb-5">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-black text-gray-900">{currentLead.name}</h2>
-                  <span className={`px-3 py-1 text-xs font-bold rounded-full border ${currentLead.status === 'registered' ? 'bg-green-100 text-green-800 border-green-300' : currentLead.status === 'follow-up' ? 'bg-orange-100 text-orange-800 border-orange-300' : 'bg-blue-100 text-blue-800 border-blue-300'}`}>
-                    {currentLead.status?.toUpperCase()}
-                  </span>
+          {/* TWO COLUMN WORKSPACE CARD */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-gray-200">
+              
+              {/* LEFT COLUMN: LEAD INFORMATION */}
+              <div className="md:col-span-7 p-5 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">{currentLead.name}</h2>
+                    <p className="text-xs text-gray-500 font-medium">Source: {currentLead.source || 'Website'}</p>
+                  </div>
+                  <div>
+                    {isMissedFollowUp(currentLead) ? (
+                      <span className="px-2.5 py-1 text-[11px] font-black rounded-md bg-red-100 text-red-800 border border-red-200 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> MISSED FOLLOW-UP
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 text-[11px] font-bold rounded-md bg-blue-50 text-blue-800 border border-blue-200 uppercase">
+                        {currentLead.status || 'FRESH'}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-gray-600">
-                  <div className="flex items-center gap-1.5 font-medium">
-                    <span>📱 Primary:</span>
-                    <strong className="text-gray-900">{currentLead.phone}</strong>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                    <span className="text-gray-400 block text-[10px] font-bold uppercase">Phone Number</span>
+                    <span className="font-bold text-gray-900">{currentLead.phone}</span>
                   </div>
-                  {currentLead.email && (
-                    <div className="flex items-center gap-1.5 font-medium">
-                      <span>✉️ Email:</span>
-                      <strong className="text-gray-900">{currentLead.email}</strong>
+                  <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                    <span className="text-gray-400 block text-[10px] font-bold uppercase">Target Course</span>
+                    <span className="font-bold text-primary-700">{currentLead.product || 'Data Science'}</span>
+                  </div>
+                  <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                    <span className="text-gray-400 block text-[10px] font-bold uppercase">Campus</span>
+                    <span className="font-bold text-gray-900">{currentLead.campus || 'Kochi'}</span>
+                  </div>
+                  <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                    <span className="text-gray-400 block text-[10px] font-bold uppercase">Country</span>
+                    <span className="font-bold text-gray-900">{currentLead.country || 'India'}</span>
+                  </div>
+                </div>
+
+                {/* Direct Action Links (Tel / WhatsApp) */}
+                <div className="flex items-center gap-2 pt-1">
+                  <a
+                    href={`tel:${ensureE164(currentLead.phone)}`}
+                    className="flex-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-gray-200"
+                  >
+                    <Phone className="h-3.5 w-3.5 text-gray-600" />
+                    Dial Tel
+                  </a>
+                  <a
+                    href={`https://wa.me/${getWhatsAppNumber(currentLead.phone)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-emerald-200"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                    WhatsApp
+                  </a>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN: CALL CONTROLS & STATE MACHINE */}
+              <div className="md:col-span-5 p-5 bg-gray-50/50 flex flex-col justify-between space-y-4">
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Telephony Control</div>
+                  
+                  {callState === 'idle' ? (
+                    <button
+                      onClick={() => handleStartCall(currentLead.phone)}
+                      className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-black text-sm tracking-wide transition-all shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Phone className="h-4 w-4" />
+                      CALL NOW
+                    </button>
+                  ) : (
+                    <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-red-700 uppercase tracking-wider animate-pulse">
+                          {callState === 'connected' ? `CONNECTED ${formatTimer(callTimer)}` : 'RINGING...'}
+                        </span>
+                        <button
+                          onClick={() => handleEndCall('completed')}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-md flex items-center gap-1 transition-colors"
+                        >
+                          <PhoneOff className="h-3.5 w-3.5" />
+                          END CALL
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-gray-500">Dialed: {calledPhone}</p>
                     </div>
                   )}
-                  <div className="flex items-center gap-1.5 font-medium">
-                    <span>📍 Country:</span>
-                    <strong className="text-gray-900">{currentLead.country}</strong>
-                  </div>
-                  <div className="flex items-center gap-1.5 font-medium">
-                    <span>🎓 Campus:</span>
-                    <strong className="text-primary-700 font-bold">{currentLead.campus || 'Kochi'}</strong>
-                  </div>
                 </div>
-              </div>
 
-              {/* 3. One-Click Calling & Live Call State Panel */}
-              <div className="flex items-center gap-2 self-start">
-                {callState === 'idle' ? (
-                  <button
-                    onClick={() => handleStartCall(currentLead.phone)}
-                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all shadow-md hover:shadow-lg active:scale-95"
-                  >
-                    <Phone className="h-4 w-4" />
-                    CALL LEAD
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-3 bg-red-50 border-2 border-red-300 px-4 py-2 rounded-xl shadow-sm">
-                    <div className="flex flex-col">
-                      <span className="text-[11px] font-black text-red-700 tracking-wider uppercase animate-pulse">
-                        {callState === 'connected' ? `CONNECTED (${formatTimer(callTimer)})` : 'RINGING...'}
-                      </span>
-                      <span className="text-[10px] text-gray-500 font-medium">{calledPhone}</span>
-                    </div>
-                    <button
-                      onClick={() => handleEndCall('completed')}
-                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
-                      title="End Call"
-                    >
-                      <PhoneOff className="h-3.5 w-3.5" />
-                      END
-                    </button>
+                {/* Overdue Follow-up alert if present */}
+                {currentLead.nextFollowUpAt && (
+                  <div className="p-2.5 rounded-lg bg-gray-100 text-[11px] text-gray-600">
+                    <span className="font-bold text-gray-700 block">Scheduled Follow-up:</span>
+                    {format(new Date(currentLead.nextFollowUpAt), 'MMM dd, yyyy HH:mm')} ({formatDistanceToNow(new Date(currentLead.nextFollowUpAt), { addSuffix: true })})
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Error Safeguard Banner */}
-            {saveError && (
-              <div className="bg-red-50 border-l-4 border-red-600 p-4 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs font-bold text-red-900">{saveError}</p>
-                    <p className="text-[11px] text-red-700">Form state has been safely preserved. Click Retry to submit again.</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleSaveLead(false)}
-                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors"
-                >
-                  Retry Save
-                </button>
-              </div>
-            )}
-
-            {/* 4. Call Outcome & Normalized Disposition Selection */}
-            <div className="space-y-4 border-b pb-5">
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                Call Outcome / Disposition
-              </label>
-
-              <div className="flex flex-wrap gap-2">
-                {(dispositions.length > 0 ? dispositions : [
-                  { label: 'Connected', category: 'connected' },
-                  { label: 'Follow-up Required', category: 'callback' },
-                  { label: 'RNR (Ring No Response)', category: 'no_answer' },
-                  { label: 'Busy', category: 'busy' },
-                  { label: 'Not Interested', category: 'not_interested' },
-                  { label: 'Registered', category: 'registered' },
-                  { label: 'Wrong Number', category: 'other' }
-                ]).map((d) => (
-                  <button
-                    key={d.label}
-                    type="button"
-                    onClick={() => {
-                      setDisposition(d.label);
-                      if (d.category === 'registered') setStatus('registered');
-                      else if (d.requiresFollowUp || d.category === 'callback') setStatus('follow-up');
-                    }}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all ${disposition === d.label ? 'bg-primary-600 text-white border-primary-600 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'}`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 5. Follow-Up & Form Inputs Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* BOTTOM SECTION: DISPOSITION, FOLLOW-UP, NOTES & ACTIONS */}
+            <div className="p-5 border-t border-gray-200 space-y-4">
+              
+              {/* Disposition Chips */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Lead Status</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="input-field text-xs font-medium"
-                >
-                  <option value="fresh">Fresh</option>
-                  <option value="follow-up">Follow-up Required</option>
-                  <option value="registered">Registered</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Campus Location</label>
-                <select
-                  value={campus}
-                  onChange={(e) => setCampus(e.target.value)}
-                  className="input-field text-xs font-medium"
-                >
-                  <option value="Kochi">Kochi</option>
-                  <option value="Chennai">Chennai</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Next Follow-up Date & Time {(status === 'follow-up' || disposition.includes('Follow-up')) && <span className="text-red-500">*</span>}
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                  Call Disposition Outcome
                 </label>
-                <input
-                  type="datetime-local"
-                  value={nextFollowUpAt}
-                  onChange={(e) => setNextFollowUpAt(e.target.value)}
-                  className={`input-field text-xs font-medium ${saveError && !nextFollowUpAt ? 'border-red-500' : ''}`}
+                <div className="flex flex-wrap gap-1.5">
+                  {(dispositions.length > 0 ? dispositions : [
+                    { label: 'Interested', category: 'connected' },
+                    { label: 'Follow-up', category: 'callback' },
+                    { label: 'RNR', category: 'no_answer' },
+                    { label: 'Busy', category: 'busy' },
+                    { label: 'Not Interested', category: 'not_interested' },
+                    { label: 'Registered', category: 'registered' },
+                    { label: 'Dead', category: 'other' }
+                  ]).map((d) => {
+                    const isSelected = disposition === d.label;
+                    return (
+                      <button
+                        key={d.label}
+                        type="button"
+                        onClick={() => {
+                          setDisposition(d.label);
+                          if (d.category === 'registered') setStatus('registered');
+                          else if (d.requiresFollowUp || d.category === 'callback' || d.label.toLowerCase().includes('follow-up')) {
+                            setStatus('follow-up');
+                          }
+                        }}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1 ${
+                          isSelected
+                            ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                        {d.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Follow-up & Form Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Status</label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-xs font-medium bg-white"
+                  >
+                    <option value="fresh">Fresh</option>
+                    <option value="follow-up">Follow-up Required</option>
+                    <option value="registered">Registered</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Campus</label>
+                  <select
+                    value={campus}
+                    onChange={(e) => setCampus(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-xs font-medium bg-white"
+                  >
+                    <option value="Kochi">Kochi</option>
+                    <option value="Chennai">Chennai</option>
+                  </select>
+                </div>
+
+                <div className={(status === 'follow-up' || disposition.toLowerCase().includes('follow-up')) ? 'ring-2 ring-primary-500 rounded-lg p-0.5' : ''}>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    Next Follow-up Date & Time {(status === 'follow-up' || disposition.toLowerCase().includes('follow-up')) && <span className="text-red-500">*</span>}
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={nextFollowUpAt}
+                    onChange={(e) => setNextFollowUpAt(e.target.value)}
+                    className={`w-full px-3 py-1.5 border rounded-lg text-xs font-medium bg-white ${saveError && !nextFollowUpAt ? 'border-red-500' : ''}`}
+                  />
+                </div>
+              </div>
+
+              {/* Call Notes */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">Call Notes</label>
+                <textarea
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Enter student interaction notes, objections, or next steps..."
+                  className="w-full px-3 py-2 border rounded-lg text-xs bg-white"
                 />
               </div>
-            </div>
 
-            {/* 6. Call Notes & Student Requirements */}
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Call Notes & Requirements</label>
-              <textarea
-                rows={3}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Enter call notes, student requirements, course interest, or next action steps..."
-                className="input-field text-xs"
-              />
-            </div>
+              {/* Action Buttons: SAVE vs SAVE & NEXT */}
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => handleSaveLead(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  {saving ? 'Saving...' : 'SAVE'}
+                </button>
 
-            {/* 7. Action Bar: SAVE vs SAVE & NEXT */}
-            <div className="pt-4 border-t flex flex-col sm:flex-row items-center justify-end gap-3">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => handleSaveLead(false)}
-                className="w-full sm:w-auto px-5 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                <Save className="h-4 w-4 text-gray-600" />
-                {saving ? 'Saving...' : 'SAVE'}
-              </button>
-
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => handleSaveLead(true)}
-                className="w-full sm:w-auto px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-extrabold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-95"
-              >
-                <span>{saving ? 'Processing...' : 'SAVE & NEXT'}</span>
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* 8. Structured Payment Tracking & Batch Allocation Status Widget */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-primary-600" />
-                <h3 className="text-base font-bold text-gray-900">Structured Payment Record</h3>
-              </div>
-              <div className="text-xs font-bold text-gray-700">
-                Verified Cleared: <span className="text-emerald-600 font-extrabold">₹{(currentLead.paidAmount || 0).toLocaleString('en-IN')}</span>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => handleSaveLead(true)}
+                  className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-xs font-black transition-all disabled:opacity-50 flex items-center gap-1.5 shadow-md hover:shadow-lg active:scale-95"
+                >
+                  <span>{saving ? 'Processing...' : 'SAVE & NEXT'}</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
 
-            {/* Batch Allocation Lock Status Notice */}
-            <div className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between ${currentLead.batchEligible ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
-              <div className="flex items-center gap-2">
-                {currentLead.batchEligible ? (
-                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                )}
-                <span>
-                  {currentLead.batchEligible
-                    ? '🎉 Verified total reaches ₹9,000 threshold. Batch Allocation is UNLOCKED.'
-                    : `⚠️ Verified total ₹${(currentLead.paidAmount || 0).toLocaleString('en-IN')} is below ₹9,000. Batch Allocation is LOCKED.`}
-                </span>
+            {/* STRUCTURED PAYMENT TRACKING WIDGET */}
+            <div className="p-4 bg-gray-50 border-t border-gray-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+                  <CreditCard className="h-4 w-4 text-primary-600" />
+                  <span>Structured Payment Entry</span>
+                </div>
+                <div className="text-xs font-bold text-gray-700">
+                  Cleared: <span className="text-emerald-600">₹{(currentLead.paidAmount || 0).toLocaleString('en-IN')}</span>
+                </div>
               </div>
-            </div>
 
-            {/* Quick Record Payment Form */}
-            <form onSubmit={handleRecordPayment} className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 mb-1">Fee Type</label>
+              <form onSubmit={handleRecordPayment} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                 <select
                   value={paymentType}
                   onChange={(e) => setPaymentType(e.target.value)}
-                  className="input-field text-xs font-medium py-1.5"
+                  className="px-2.5 py-1.5 border rounded-lg text-xs font-medium bg-white"
                 >
                   <option value="admission">Admission Fee</option>
                   <option value="orientation">Orientation Fee</option>
                   <option value="tuition">Tuition Fee</option>
                 </select>
-              </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 mb-1">Amount (₹)</label>
                 <input
                   type="number"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="input-field text-xs py-1.5 font-bold"
-                  placeholder="1000"
+                  className="px-2.5 py-1.5 border rounded-lg text-xs font-bold bg-white"
+                  placeholder="Amount ₹"
                   min="1"
                 />
-              </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 mb-1">Reference ID</label>
                 <input
                   type="text"
                   value={paymentRef}
                   onChange={(e) => setPaymentRef(e.target.value)}
-                  className="input-field text-xs py-1.5"
-                  placeholder="UPI / Txn Ref"
+                  className="px-2.5 py-1.5 border rounded-lg text-xs bg-white"
+                  placeholder="UPI / Reference ID"
                 />
-              </div>
 
-              <div className="flex items-end">
                 <button
                   type="submit"
                   disabled={recordingPayment}
-                  className="w-full btn-secondary text-xs py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 font-bold flex items-center justify-center gap-1.5"
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1"
                 >
                   <DollarSign className="h-3.5 w-3.5" />
                   {recordingPayment ? 'Recording...' : 'Record Payment'}
                 </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
       )}

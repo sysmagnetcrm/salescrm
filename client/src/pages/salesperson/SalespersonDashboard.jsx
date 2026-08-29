@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardAPI } from '../../services/api';
 import StatCard from '../../components/StatCard';
-import { ClipboardList, Phone, CheckCircle, XCircle, DollarSign, Target } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { ClipboardList, Phone, CheckCircle, DollarSign, Target, Activity, Calendar } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
-import toast from 'react-hot-toast';
 
 const SalespersonDashboard = () => {
   const { data: dashboardData, isLoading } = useQuery({
@@ -15,6 +14,8 @@ const SalespersonDashboard = () => {
   });
 
   const { overview, monthly, weekly, recentCalls } = dashboardData || {};
+
+  const hasTargetData = (weekly?.target > 0 || monthly?.target > 0 || weekly?.closedLeads > 0 || monthly?.closedLeads > 0);
 
   const performanceData = [
     {
@@ -38,23 +39,24 @@ const SalespersonDashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 max-w-6xl mx-auto pb-12">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">My Performance Dashboard</h1>
-        <p className="text-sm text-gray-500">Track your leads, sales conversions, and activity metrics</p>
+        <h1 className="text-xl font-bold text-gray-900">My Dashboard</h1>
+        <p className="text-xs text-gray-500">Secondary performance overview and call activity log</p>
       </div>
 
-      {/* Overview Cards */}
+      {/* Overview Cards (Top Row) */}
       {isLoading && !dashboardData ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-28 bg-gray-200 animate-pulse rounded-xl" />
+            <div key={i} className="h-20 bg-gray-200 animate-pulse rounded-xl" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard
-            title="Total Assigned Leads"
+            title="Assigned Leads"
             value={overview?.totalLeads ?? 0}
             icon={ClipboardList}
             color="blue"
@@ -66,13 +68,13 @@ const SalespersonDashboard = () => {
             color="yellow"
           />
           <StatCard
-            title="Total Registered Students"
+            title="Registered"
             value={overview?.closedLeads ?? 0}
             icon={CheckCircle}
             color="green"
           />
           <StatCard
-            title="Revenue Generated"
+            title="Revenue"
             value={formatCurrency(overview?.totalRevenue)}
             icon={DollarSign}
             color="purple"
@@ -80,20 +82,25 @@ const SalespersonDashboard = () => {
         </div>
       )}
 
-      {/* Target Progress & Chart Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Weekly & Monthly Targets */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Target Achievement</h2>
-          <div className="space-y-6">
+      {/* Targets & Activity Progress Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Target Progress */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-4">
+          <div className="flex items-center justify-between border-b pb-2">
+            <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+              <Target className="h-4 w-4 text-primary-600" />
+              Target Achievement
+            </h2>
+          </div>
+          <div className="space-y-4">
             <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="font-medium text-gray-700">Weekly Target Progress</span>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="font-semibold text-gray-700">Weekly Goal</span>
                 <span className="text-gray-900 font-bold">
                   {weekly?.closedLeads || 0} / {weekly?.target || 0} Leads
                 </span>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+              <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
                 <div
                   className="bg-primary-600 h-full rounded-full transition-all duration-500"
                   style={{
@@ -107,15 +114,15 @@ const SalespersonDashboard = () => {
             </div>
 
             <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="font-medium text-gray-700">Monthly Target Progress</span>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="font-semibold text-gray-700">Monthly Goal</span>
                 <span className="text-gray-900 font-bold">
                   {monthly?.closedLeads || 0} / {monthly?.target || 0} Leads
                 </span>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+              <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
                 <div
-                  className="bg-green-600 h-full rounded-full transition-all duration-500"
+                  className="bg-emerald-600 h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${Math.min(
                       100,
@@ -128,61 +135,78 @@ const SalespersonDashboard = () => {
           </div>
         </div>
 
-        {/* Target vs Achievement Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Target Comparison</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={performanceData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="Target" fill="#E5E7EB" name="Assigned Target" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Achieved" fill="#2563EB" name="Conversions" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+        {/* Target Comparison Chart or Compact Empty State */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-3">
+          <div className="flex items-center justify-between border-b pb-2">
+            <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+              <Activity className="h-4 w-4 text-emerald-600" />
+              Target vs Conversions
+            </h2>
           </div>
+          {hasTargetData ? (
+            <div className="h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={performanceData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="Target" fill="#E5E7EB" name="Assigned Target" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Achieved" fill="#2563EB" name="Conversions" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-44 flex flex-col items-center justify-center text-center p-4 border border-dashed border-gray-200 rounded-lg">
+              <Activity className="h-8 w-8 text-gray-300 mb-1" />
+              <p className="text-xs font-bold text-gray-600">No activity data yet</p>
+              <p className="text-[11px] text-gray-400">Start processing leads in the Working Queue to see performance charts.</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Recent Activity / Calls */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Call Activity</h2>
+      {/* Recent Call Activity Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+            <Phone className="h-4 w-4 text-primary-600" />
+            Recent Telephony Activity
+          </h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-gray-50 text-[11px] font-bold text-gray-500 uppercase border-b border-gray-100">
               <tr>
-                <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3">Lead</th>
-                <th className="px-6 py-3">Duration</th>
-                <th className="px-6 py-3">Outcome</th>
+                <th className="px-4 py-2.5">Time</th>
+                <th className="px-4 py-2.5">Lead Name</th>
+                <th className="px-4 py-2.5">Talk Duration</th>
+                <th className="px-4 py-2.5">Outcome</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {(recentCalls || []).map((call) => (
-                <tr key={call.id} className="hover:bg-gray-50/50">
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                <tr key={call.id} className="hover:bg-gray-50/60 transition-colors">
+                  <td className="px-4 py-2.5 whitespace-nowrap text-gray-500">
                     {call.createdAt ? format(new Date(call.createdAt), 'MMM dd, HH:mm') : 'N/A'}
                   </td>
-                  <td className="px-6 py-4 font-medium text-gray-900">
+                  <td className="px-4 py-2.5 font-bold text-gray-900">
                     {call.Lead?.name || 'Lead'}
                   </td>
-                  <td className="px-6 py-4 text-gray-600">
+                  <td className="px-4 py-2.5 text-gray-600 font-medium">
                     {call.duration} sec
                   </td>
-                  <td className="px-6 py-4 font-semibold text-gray-700">
-                    {call.outcome || 'Logged'}
+                  <td className="px-4 py-2.5 font-semibold text-gray-700">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-700 font-bold">
+                      {call.outcome || 'Logged'}
+                    </span>
                   </td>
                 </tr>
               ))}
               {(!recentCalls || recentCalls.length === 0) && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                    No recent calls logged.
+                  <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
+                    No recent call activity logged.
                   </td>
                 </tr>
               )}
