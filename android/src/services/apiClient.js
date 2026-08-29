@@ -1,5 +1,5 @@
 // Android API Client supporting JWT Auth, 30-min inactivity, version enforcement, and retry
-const BASE_URL = process.env.API_URL || 'http://localhost:5000/api';
+const BASE_URL = process.env.API_URL || 'https://salescrm-7z2o.onrender.com/api';
 const CLIENT_VERSION = '1.2.0';
 
 class AndroidApiClient {
