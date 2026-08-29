@@ -1,6 +1,5 @@
 import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
-import dns from 'dns';
 
 dotenv.config();
 
@@ -10,16 +9,6 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Individual DB_* vars are used as fallback for local postgres dev.
 const DATABASE_URL = process.env.DATABASE_URL;
 const usePostgres = isProduction || process.env.DB_DIALECT === 'postgres' || !!DATABASE_URL;
-
-// Force IPv4 DNS resolution — Render free tier has no IPv6 outbound.
-// This custom lookup is injected directly into pg so it always picks
-// an IPv4 address even when the hostname also has an AAAA (IPv6) record.
-const ipv4Lookup = (hostname, _options, callback) => {
-  dns.resolve4(hostname, (err, addresses) => {
-    if (err) return callback(err);
-    callback(null, addresses[0], 4);
-  });
-};
 
 let sequelize;
 
@@ -33,8 +22,7 @@ if (usePostgres) {
         ssl: {
           require: true,
           rejectUnauthorized: false  // Required for Supabase / Render managed TLS
-        },
-        lookup: ipv4Lookup  // Force IPv4 — prevents ENETUNREACH on Render free tier
+        }
       },
       pool: {
         max: 10,
