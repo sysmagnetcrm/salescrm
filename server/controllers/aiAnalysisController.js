@@ -27,10 +27,22 @@ export const triggerAIAnalysis = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden: Access to this call record denied.' });
     }
 
+    const isDevMock = process.env.TELEPHONY_PROVIDER === 'development' || !process.env.TELEPHONY_PROVIDER;
+    const hasAudio = Boolean(callLog.recordingUrl);
+
+    if (!isDevMock && !hasAudio) {
+      return res.status(400).json({
+        success: false,
+        message: 'AI Analysis Unavailable: Call recording is not available for this call.'
+      });
+    }
+
     // 1. Immediate Non-Blocking Response (HTTP 202 Accepted)
     res.status(202).json({
       success: true,
-      message: 'AI call intelligence analysis queued asynchronously.',
+      message: isDevMock
+        ? 'AI call intelligence analysis queued (Development Mock Mode).'
+        : 'AI call intelligence analysis queued asynchronously.',
       callLogId: id
     });
 

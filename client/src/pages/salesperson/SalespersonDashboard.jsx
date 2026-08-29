@@ -82,6 +82,43 @@ const SalespersonDashboard = () => {
         </div>
       )}
 
+      {/* Real DB Telephony Call Metrics */}
+      {dashboardData?.callMetrics && (
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-3">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+            <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+              <Phone className="h-4 w-4 text-primary-600" />
+              Today's Telephony Performance
+            </h2>
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+              Connection Rate: {dashboardData.callMetrics.connectionRatePercent}%
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center text-xs">
+            <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+              <span className="text-gray-400 block text-[10px] font-bold uppercase">Calls Attempted</span>
+              <span className="text-base font-black text-gray-900">{dashboardData.callMetrics.callsToday}</span>
+            </div>
+            <div className="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-100">
+              <span className="text-emerald-700 block text-[10px] font-bold uppercase">Connected Calls</span>
+              <span className="text-base font-black text-emerald-800">{dashboardData.callMetrics.connectedCalls}</span>
+            </div>
+            <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-100">
+              <span className="text-blue-700 block text-[10px] font-bold uppercase">Total Talk Time</span>
+              <span className="text-base font-black text-blue-800">
+                {Math.floor(dashboardData.callMetrics.totalTalkTimeSeconds / 60)}m {dashboardData.callMetrics.totalTalkTimeSeconds % 60}s
+              </span>
+            </div>
+            <div className="bg-purple-50/70 p-2.5 rounded-lg border border-purple-100">
+              <span className="text-purple-700 block text-[10px] font-bold uppercase">Avg Talk Time</span>
+              <span className="text-base font-black text-purple-800">
+                {Math.floor(dashboardData.callMetrics.avgTalkTimeSeconds / 60)}m {dashboardData.callMetrics.avgTalkTimeSeconds % 60}s
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Targets & Activity Progress Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Target Progress */}

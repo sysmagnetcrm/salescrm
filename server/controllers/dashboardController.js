@@ -1,4 +1,4 @@
-import { Lead, User, Activity } from '../models/index.js';
+import { Lead, User, Activity, CallLog } from '../models/index.js';
 import { Op } from 'sequelize';
 import sequelize from '../config/database.js';
 import { getStartOfWeek, getStartOfMonth } from '../utils/dateUtils.js';
@@ -173,6 +173,8 @@ export const getSalespersonDashboard = async (req, res) => {
     const userId = req.user.id;
     const startOfMonth = getStartOfMonth();
     const startOfWeek = getStartOfWeek();
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
     // My leads count
     const myLeadsCount = await Lead.count({
@@ -217,13 +219,60 @@ export const getSalespersonDashboard = async (req, res) => {
       attributes: ['monthlyTarget', 'weeklyTarget']
     });
 
-    // Recent calls (last 7 days)
-    const recentCalls = await Lead.findAll({
+    // Real Telephony Call Metrics from DB CallLog table
+    const callsTodayCount = await CallLog.count({
       where: {
-        assignedTo: userId,
-        lastCalled: { [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        [Op.or]: [{ callerUserId: userId }, { leadOwnerId: userId }],
+        createdAt: { [Op.gte]: startOfToday }
+      }
+    });
+
+    const connectedTodayCount = await CallLog.count({
+      where: {
+        [Op.or]: [{ callerUserId: userId }, { leadOwnerId: userId }],
+        callStatus: 'completed',
+        createdAt: { [Op.gte]: startOfToday }
+      }
+    });
+
+    const noAnswerTodayCount = await CallLog.count({
+      where: {
+        [Op.or]: [{ callerUserId: userId }, { leadOwnerId: userId }],
+        callStatus: 'no-answer',
+        createdAt: { [Op.gte]: startOfToday }
+      }
+    });
+
+    const busyTodayCount = await CallLog.count({
+      where: {
+        [Op.or]: [{ callerUserId: userId }, { leadOwnerId: userId }],
+        callStatus: 'busy',
+        createdAt: { [Op.gte]: startOfToday }
+      }
+    });
+
+    const totalTalkTimeSum = await CallLog.sum('durationSeconds', {
+      where: {
+        [Op.or]: [{ callerUserId: userId }, { leadOwnerId: userId }],
+        callStatus: 'completed',
+        createdAt: { [Op.gte]: startOfToday }
+      }
+    });
+
+    const totalTalkTimeSeconds = parseInt(totalTalkTimeSum || 0);
+    const avgTalkTimeSeconds = connectedTodayCount > 0 ? Math.round(totalTalkTimeSeconds / connectedTodayCount) : 0;
+    const connectionRatePercent = callsTodayCount > 0 ? parseFloat(((connectedTodayCount / callsTodayCount) * 100).toFixed(1)) : 0;
+
+    // Recent calls (last 7 days from CallLog)
+    const recentCallsLogs = await CallLog.findAll({
+      where: {
+        [Op.or]: [{ callerUserId: userId }, { leadOwnerId: userId }],
+        createdAt: { [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
       },
-      order: [['lastCalled', 'DESC']],
+      include: [
+        { model: Lead, as: 'lead', attributes: ['id', 'name', 'phone'] }
+      ],
+      order: [['createdAt', 'DESC']],
       limit: 10
     });
 
@@ -254,6 +303,15 @@ export const getSalespersonDashboard = async (req, res) => {
           registeredLeads: registeredCount,
           deadLeads: getStatusCount(LEAD_STATUS.DEAD)
         },
+        callMetrics: {
+          callsToday: callsTodayCount,
+          connectedCalls: connectedTodayCount,
+          noAnswerCalls: noAnswerTodayCount,
+          busyCalls: busyTodayCount,
+          totalTalkTimeSeconds,
+          avgTalkTimeSeconds,
+          connectionRatePercent
+        },
         monthly: {
           totalLeads: monthlyTotalLeads,
           closedLeads: monthlyClosedLeads,
@@ -274,7 +332,14 @@ export const getSalespersonDashboard = async (req, res) => {
             ? ((weeklyClosedLeads / parseFloat(user.weeklyTarget)) * 100).toFixed(2)
             : 0
         },
-        recentCalls,
+        recentCalls: recentCallsLogs.map(c => ({
+          id: c.id,
+          createdAt: c.createdAt,
+          duration: c.durationSeconds,
+          lifecycleDuration: c.lifecycleDurationSeconds,
+          outcome: c.disposition || c.callStatus,
+          Lead: c.lead ? { name: c.lead.name, phone: c.lead.phone } : null
+        })),
         recentActivities
       }
     });

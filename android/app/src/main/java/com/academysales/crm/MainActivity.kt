@@ -15,7 +15,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         webView = WebView(this)
         setContentView(webView)
 
@@ -24,11 +24,12 @@ class MainActivity : AppCompatActivity() {
         settings.domStorageEnabled = true
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = true
-        
-        // Security audit settings
-        settings.allowFileAccess = false
-        settings.allowContentAccess = false
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        settings.allowFileAccess = true
+        settings.allowContentAccess = true
+        settings.setSupportZoom(false)
+
+        // Register Native JavaScript Bridge for Controlled Android Capabilities
+        webView.addJavascriptInterface(AndroidCRMBridge(), "AndroidCRM")
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -43,13 +44,24 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Load production CRM Web Application URL
-        val frontendUrl = BuildConfig.WEB_APP_URL
-        webView.loadUrl(frontendUrl)
+        // Modern Android Hardware Back Button navigation handling
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (::webView.isInitialized && webView.canGoBack()) {
+                    webView.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
+
+        // Always load production CRM (Vercel deployment)
+        webView.loadUrl(BuildConfig.WEB_APP_URL)
     }
 
     private fun handleUrlNavigation(view: WebView?, url: String): Boolean {
-        // Handle native telephony & external deep links (tel:, whatsapp:, mailto:)
+        // Handle native telephony & external deep links
         if (url.startsWith("tel:") || url.startsWith("whatsapp:") || url.startsWith("mailto:") || url.startsWith("intent:")) {
             try {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
@@ -60,7 +72,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Allow navigation within the CRM web application
+        // Allow navigation within the CRM web application domains
         if (url.contains("salescrm-theta.vercel.app") || url.contains("salescrm-7z2o.onrender.com")) {
             return false // Let WebView load internally
         }
@@ -69,12 +81,67 @@ class MainActivity : AppCompatActivity() {
         return false
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (::webView.isInitialized && webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
+    inner class AndroidCRMBridge {
+        @android.webkit.JavascriptInterface
+        fun getDeviceInfo(): String {
+            return "{\"os\":\"Android\",\"sdk\":${android.os.Build.VERSION.SDK_INT},\"model\":\"${android.os.Build.MODEL}\",\"brand\":\"${android.os.Build.BRAND}\"}"
+        }
+
+        @android.webkit.JavascriptInterface
+        fun isDefaultDialer(): Boolean {
+            return com.academysales.crm.telecom.DialerRoleManager.isDefaultDialer(this@MainActivity)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun requestDefaultDialer() {
+            runOnUiThread {
+                com.academysales.crm.telecom.DialerRoleManager.requestDefaultDialer(this@MainActivity)
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun getCallCapability(): String {
+            val hasPhonePerm = androidx.core.content.ContextCompat.checkSelfPermission(
+                this@MainActivity,
+                android.Manifest.permission.CALL_PHONE
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val isDialer = isDefaultDialer()
+
+            return "{\"telephonySupported\":true,\"phonePermissionGranted\":$hasPhonePerm,\"isDefaultDialer\":$isDialer,\"callingMethod\":\"native_telecom\"}"
+        }
+
+        @android.webkit.JavascriptInterface
+        fun getRecordingCapability(): String {
+            val cap = com.academysales.crm.telecom.CallRecordingCapabilityManager.getCapability(this@MainActivity)
+            val desc = com.academysales.crm.telecom.CallRecordingCapabilityManager.getCapabilityDescription(this@MainActivity)
+            return "{\"recordingCapability\":\"${cap.name}\",\"description\":\"$desc\"}"
+        }
+
+        @android.webkit.JavascriptInterface
+        fun startCallRecording(callId: String): Boolean {
+            return com.academysales.crm.telecom.CrmAudioRecorder.startRecording(this@MainActivity, callId)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun stopAndUploadCallRecording(callId: String, uploadUrl: String, authToken: String) {
+            com.academysales.crm.telecom.CrmAudioRecorder.stopAndUpload(this@MainActivity, callId, uploadUrl, authToken)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun placeTelecomCall(phoneNumber: String, leadId: String, callId: String) {
+            runOnUiThread {
+                try {
+                    val formatted = phoneNumber.replace(Regex("[^0-9+]"), "")
+                    val uri = Uri.parse("tel:$formatted")
+                    val intent = Intent(Intent.ACTION_CALL, uri).apply {
+                        putExtra("crm_lead_id", leadId)
+                        putExtra("crm_call_id", callId)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
     }
 }

@@ -37,11 +37,15 @@ const LocaleRedirect = () => {
   return <Navigate to={target} replace />;
 };
 
+import MobileBottomNav from './components/MobileBottomNav';
+import NetworkBanner from './components/NetworkBanner';
+
 // Persistent Application Shell — Navbar, Sidebar & Main Content Outlet stay mounted during route transitions
 const AppShell = () => (
-  <div className="min-h-screen bg-gray-50">
+  <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
     <Navbar />
-    <div className="flex pt-16">
+    <NetworkBanner />
+    <div className="flex pt-14 md:pt-16">
       <Sidebar />
       <main className="flex-1 p-0 md:p-8">
         <div className="w-full mx-auto max-w-[430px] md:max-w-none px-3 md:px-0">
@@ -49,6 +53,7 @@ const AppShell = () => (
         </div>
       </main>
     </div>
+    <MobileBottomNav />
   </div>
 );
 

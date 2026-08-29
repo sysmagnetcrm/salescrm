@@ -73,84 +73,160 @@ const CallHistory = () => {
         </div>
       </div>
 
-      {/* Call Records Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* Call Records Table (Desktop) & Cards (Mobile) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {loading && !callLogs.length ? (
-          <div className="p-8 text-center text-gray-400 animate-pulse">Loading call records...</div>
+          <div className="p-8 text-center text-gray-400 animate-pulse font-medium">Loading call records...</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
-                <tr>
-                  <th className="px-6 py-3">Timestamp</th>
-                  <th className="px-6 py-3">Lead / Phone</th>
-                  <th className="px-6 py-3">Caller BDE</th>
-                  <th className="px-6 py-3">Connected Talk Time</th>
-                  <th className="px-6 py-3">Disposition / Status</th>
-                  <th className="px-6 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {callLogs.map((call) => (
-                  <tr key={call.id} className="hover:bg-gray-50/50">
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-500">
-                      {call.createdAt ? format(new Date(call.createdAt), 'MMM dd, yyyy HH:mm') : 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      <div>{call.Lead?.name || 'Unknown Lead'}</div>
-                      <div className="text-xs text-gray-400">{call.phoneDialed}</div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-700">
-                      <div className="flex items-center gap-1.5">
-                        <span>{call.User?.name || 'BDE'}</span>
-                        {call.callerUserId && String(call.callerUserId) !== String(call.userId) && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-800" title="TL called on behalf of BDE">
-                            <UserCheck className="h-3 w-3 mr-0.5" /> TL on-behalf
+          <>
+            {/* DESKTOP TABLE */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3">Timestamp</th>
+                    <th className="px-6 py-3">Lead / Phone</th>
+                    <th className="px-6 py-3">Caller BDE</th>
+                    <th className="px-6 py-3">Connected Talk Time</th>
+                    <th className="px-6 py-3">Disposition / Status</th>
+                    <th className="px-6 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {callLogs.map((call) => (
+                    <tr key={call.id} className="hover:bg-gray-50/50">
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-500 text-xs">
+                        {call.createdAt ? format(new Date(call.createdAt), 'MMM dd, yyyy HH:mm') : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-gray-900">
+                        <div>{call.Lead?.name || 'Unknown Lead'}</div>
+                        <div className="text-xs text-gray-400">{call.phoneDialed}</div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-700 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span>{call.User?.name || 'BDE'}</span>
+                          {call.callerUserId && String(call.callerUserId) !== String(call.userId) && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-800" title="TL called on behalf of BDE">
+                              <UserCheck className="h-3 w-3 mr-0.5" /> TL on-behalf
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900 font-semibold text-xs">
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4 text-gray-400" />
+                          <span>{call.connectedTalkTime ? `${call.connectedTalkTime}s` : '0s'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-800 border border-blue-100">
+                          {call.outcome || 'Logged'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        {call.recordingUrl ? (
+                          <div className="inline-flex items-center gap-2">
+                            <audio controls className="h-8 w-44" src={call.recordingUrl} />
+                            <a
+                              href={call.recordingUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2.5 py-1 text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors border border-primary-200"
+                            >
+                              Download
+                            </a>
+                          </div>
+                        ) : (
+                          <span className="px-2.5 py-1 text-xs text-gray-400 bg-gray-100 rounded-md border border-gray-200">
+                            Recording unavailable
                           </span>
                         )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-900 font-semibold">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4 text-gray-400" />
-                        <span>{call.connectedTalkTime ? `${call.connectedTalkTime}s` : '0s'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-800 border border-blue-100">
-                        {call.outcome || 'Logged'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      {call.recordingUrl && (
+                        <button
+                          onClick={() => handleOpenIntelligence(call)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" /> AI Intelligence
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {callLogs.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                        No telephony call records found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* MOBILE CARDS */}
+            <div className="md:hidden space-y-3 p-3 bg-gray-50/50">
+              {callLogs.map((call) => (
+                <div key={call.id} className="p-3.5 bg-white rounded-xl shadow-sm border border-gray-200 space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">{call.Lead?.name || 'Unknown Lead'}</h3>
+                      <p className="text-xs text-gray-500">{call.phoneDialed}</p>
+                    </div>
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                      {call.outcome || 'Logged'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-gray-600 pt-1 border-t border-gray-100">
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="font-extrabold text-emerald-700">Talk: {call.durationSeconds ? `${Math.floor(call.durationSeconds / 60)}:${(call.durationSeconds % 60).toString().padStart(2, '0')}` : '00:00'}</span>
+                      <span className="text-gray-300">•</span>
+                      <span className="font-semibold text-gray-700">Total: {call.lifecycleDurationSeconds ? `${Math.floor(call.lifecycleDurationSeconds / 60)}:${(call.lifecycleDurationSeconds % 60).toString().padStart(2, '0')}` : '00:00'}</span>
+                    </div>
+                    <span className="text-[11px] text-gray-400">
+                      {call.createdAt ? format(new Date(call.createdAt), 'MMM dd, HH:mm') : '—'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                    <div className="text-xs text-gray-600 flex items-center gap-1">
+                      <span className="font-semibold">{call.User?.name || 'BDE'}</span>
+                      {call.callerUserId && String(call.callerUserId) !== String(call.userId) && (
+                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
+                          TL on-behalf
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {call.recordingUrl ? (
                         <a
                           href={call.recordingUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+                          className="px-2 py-1 text-[11px] font-bold text-primary-700 bg-primary-50 rounded-lg border border-primary-200 flex items-center gap-1"
                         >
-                          <Play className="h-3.5 w-3.5" /> Play Audio
+                          <Play className="h-3 w-3" /> Play
                         </a>
+                      ) : (
+                        <span className="px-2 py-0.5 text-[10px] text-gray-400 bg-gray-100 rounded-md border border-gray-200">
+                          Recording unavailable
+                        </span>
                       )}
                       <button
                         onClick={() => handleOpenIntelligence(call)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                        className="px-2 py-1 text-[11px] font-bold text-purple-700 bg-purple-50 rounded-lg border border-purple-200 flex items-center gap-1"
                       >
-                        <Sparkles className="h-3.5 w-3.5" /> AI Intelligence
+                        <Sparkles className="h-3 w-3" /> AI
                       </button>
-                    </td>
-                  </tr>
-                ))}
-                {callLogs.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                      No telephony call records found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {callLogs.length === 0 && (
+                <div className="p-6 text-center text-gray-400 text-xs">
+                  No telephony call records found.
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 

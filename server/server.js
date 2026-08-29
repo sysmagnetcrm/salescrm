@@ -39,8 +39,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Enforce minimum supported client version
 app.use(enforceClientVersion);
 
-// Serve uploaded static assets (logos, favicons)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Serve uploaded static assets (logos, favicons, audio recordings)
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Configure CORS
 const configuredOrigins = process.env.CORS_ORIGIN

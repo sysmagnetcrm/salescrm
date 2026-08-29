@@ -1,6 +1,7 @@
 import { CallLog, Lead, Activity, User } from '../models/index.js';
 import { Op } from 'sequelize';
 import sequelize from '../config/database.js';
+import { telephonyProvider } from '../services/telephonyProvider.js';
 
 // @desc    Log call attempt or manual call log (TL calling on behalf of BDE supported)
 // @route   POST /api/calls
@@ -72,14 +73,25 @@ export const logCall = async (req, res) => {
       notes: notes ? String(notes).trim() : null
     });
 
+    // Delegate to Telephony Provider abstraction
+    const providerRes = await telephonyProvider.initiateCall({
+      callLogId: callLog.id,
+      toPhoneNumber: callLog.phoneNumber,
+      callerUserId: callLog.callerUserId
+    });
+
     lead.lastContactedAt = initStartedAt;
     lead.lastCalled = initStartedAt;
     await lead.save();
 
     res.status(201).json({
       success: true,
-      message: 'Call initiated / logged successfully.',
-      data: callLog
+      message: 'Call initiated successfully.',
+      data: {
+        ...callLog.toJSON(),
+        providerCallId: providerRes.providerCallId,
+        providerStatus: providerRes.status
+      }
     });
   } catch (error) {
     console.error('LogCall Error:', error);
@@ -95,6 +107,7 @@ export const updateCallState = async (req, res) => {
     const { id } = req.params;
     const {
       callStatus,
+      startedAt,
       ringingAt,
       connectedAt,
       endedAt,
@@ -109,6 +122,31 @@ export const updateCallState = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Call log not found.' });
     }
 
+    const terminalStatuses = ['completed', 'no-answer', 'busy', 'failed', 'cancelled'];
+    const isAlreadyEnded = terminalStatuses.includes(callLog.callStatus);
+
+    // 1. Invalid State Transition Guard: Cannot revert from a terminal state back to active calling states
+    if (isAlreadyEnded && ['initiated', 'ringing', 'connected'].includes(callStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid call state transition: Cannot change status from ${callLog.callStatus} to ${callStatus}.`
+      });
+    }
+
+    // 2. Idempotency Check: If already ended and requested status is also terminal (e.g. repeated End Call), return current state cleanly without duplicate activity logs
+    if (isAlreadyEnded && terminalStatuses.includes(callStatus)) {
+      if (disposition && !callLog.disposition) callLog.disposition = disposition;
+      if (notes && !callLog.notes) callLog.notes = notes;
+      if (recordingUrl && !callLog.recordingUrl) callLog.recordingUrl = recordingUrl;
+      await callLog.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Call state already ended (idempotent update).',
+        data: callLog
+      });
+    }
+
     if (callStatus) {
       callLog.callStatus = callStatus;
     }
@@ -117,26 +155,35 @@ export const updateCallState = async (req, res) => {
     if (notes) callLog.notes = notes;
     if (recordingUrl) callLog.recordingUrl = recordingUrl;
 
-    if (callStatus === 'ringing' && !callLog.ringingAt) {
-      callLog.ringingAt = ringingAt ? new Date(ringingAt) : new Date();
+    if (startedAt) {
+      callLog.startedAt = new Date(startedAt);
     }
 
-    if (callStatus === 'connected' && !callLog.connectedAt) {
-      callLog.connectedAt = connectedAt ? new Date(connectedAt) : new Date();
+    if (ringingAt && !callLog.ringingAt) {
+      callLog.ringingAt = new Date(ringingAt);
+    } else if (callStatus === 'ringing' && !callLog.ringingAt) {
+      callLog.ringingAt = new Date();
     }
 
-    if (['completed', 'no-answer', 'busy', 'failed', 'cancelled'].includes(callStatus)) {
+    if (connectedAt && !callLog.connectedAt) {
+      callLog.connectedAt = new Date(connectedAt);
+    } else if (callStatus === 'connected' && !callLog.connectedAt) {
+      callLog.connectedAt = new Date();
+    } else if (callStatus === 'completed' && !callLog.connectedAt) {
+      callLog.connectedAt = connectedAt ? new Date(connectedAt) : (callLog.startedAt || new Date());
+    }
+
+    if (terminalStatuses.includes(callStatus)) {
       const endTime = endedAt ? new Date(endedAt) : new Date();
       callLog.endedAt = endTime;
 
-      // Full lifecycle duration (endedAt - startedAt)
-      if (callLog.startedAt) {
-        callLog.lifecycleDurationSeconds = Math.max(0, Math.floor((endTime.getTime() - new Date(callLog.startedAt).getTime()) / 1000));
-      }
+      const startTime = callLog.startedAt ? new Date(callLog.startedAt) : endTime;
+      callLog.lifecycleDurationSeconds = Math.max(0, Math.floor((endTime.getTime() - startTime.getTime()) / 1000));
 
-      // Actual talk duration (endedAt - connectedAt for connected calls; 0 for calls that never connect)
+      // Actual talk duration (endedAt - connectedAt for connected calls; 0 for non-connected calls)
       if (callStatus === 'completed' && callLog.connectedAt) {
-        callLog.durationSeconds = Math.max(0, Math.floor((endTime.getTime() - new Date(callLog.connectedAt).getTime()) / 1000));
+        const connectTime = new Date(callLog.connectedAt);
+        callLog.durationSeconds = Math.max(0, Math.floor((endTime.getTime() - connectTime.getTime()) / 1000));
       } else {
         callLog.durationSeconds = 0;
       }
@@ -151,9 +198,9 @@ export const updateCallState = async (req, res) => {
 
     await callLog.save();
 
-    // Log Activity entry when completed or ended
-    if (['completed', 'no-answer', 'busy', 'failed', 'cancelled'].includes(callLog.callStatus)) {
-      const isTLCall = callLog.callerUserId !== callLog.leadOwnerId;
+    // Log Activity entry when transition to terminal state occurs for the first time
+    if (terminalStatuses.includes(callLog.callStatus)) {
+      const isTLCall = String(callLog.callerUserId) !== String(callLog.leadOwnerId);
       await Activity.create({
         leadId: callLog.leadId,
         userId: req.user.id,
@@ -277,6 +324,103 @@ export const getCallAudio = async (req, res) => {
       }
     });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Handle Telephony Provider Webhooks (Signature verified & Idempotent)
+// @route   POST /api/calls/webhook/provider
+// @access  Public (Signature Verified)
+export const handleProviderWebhook = async (req, res) => {
+  try {
+    // 1. Signature Verification
+    const isValidSignature = telephonyProvider.verifyWebhookSignature(req);
+    if (!isValidSignature) {
+      return res.status(401).json({ success: false, message: 'Invalid telephony provider signature.' });
+    }
+
+    // 2. Parse Standardized Event Payload
+    const payload = telephonyProvider.parseWebhookPayload(req.body);
+    const { providerCallId, callLogId, eventStatus, durationSeconds, recordingUrl } = payload;
+
+    let callLog = null;
+    if (callLogId) {
+      callLog = await CallLog.findByPk(callLogId);
+    }
+    if (!callLog && providerCallId) {
+      callLog = await CallLog.findOne({ where: { notes: { [Op.like]: `%${providerCallId}%` } } });
+    }
+
+    if (!callLog) {
+      return res.status(200).json({ success: true, message: 'Webhook received, no matching internal call found.' });
+    }
+
+    // 3. Update Call State Machine & Durations
+    const terminalStatuses = ['completed', 'no-answer', 'busy', 'failed', 'cancelled'];
+    if (eventStatus && terminalStatuses.includes(eventStatus)) {
+      callLog.callStatus = eventStatus;
+      callLog.endedAt = payload.endedAt || new Date();
+      if (durationSeconds !== null && durationSeconds !== undefined) {
+        callLog.providerDurationSeconds = durationSeconds;
+        callLog.durationSeconds = eventStatus === 'completed' ? durationSeconds : 0;
+      }
+    } else if (eventStatus === 'connected' || eventStatus === 'answered') {
+      callLog.callStatus = 'connected';
+      callLog.connectedAt = payload.connectedAt || new Date();
+    } else if (eventStatus === 'ringing') {
+      callLog.callStatus = 'ringing';
+      callLog.ringingAt = payload.ringingAt || new Date();
+    }
+
+    if (recordingUrl) {
+      callLog.recordingUrl = recordingUrl;
+    }
+
+    await callLog.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Provider webhook processed idempotently.',
+      data: { callLogId: callLog.id, status: callLog.callStatus }
+    });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Upload recorded audio file for CallLog
+// @route   POST /api/calls/:id/upload-audio
+// @access  Private
+export const uploadCallAudio = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const callLog = await CallLog.findByPk(id);
+
+    if (!callLog) {
+      return res.status(404).json({ success: false, message: 'Call log record not found.' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No audio recording file uploaded.' });
+    }
+
+    const relativePath = `/uploads/recordings/${req.file.filename}`;
+    callLog.recordingUrl = relativePath;
+    callLog.recordingStatus = 'available';
+    await callLog.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Call audio recording uploaded successfully.',
+      data: {
+        callLogId: callLog.id,
+        recordingUrl: relativePath,
+        recordingStatus: 'available'
+      }
+    });
+  } catch (error) {
+    console.error('Audio Upload Error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

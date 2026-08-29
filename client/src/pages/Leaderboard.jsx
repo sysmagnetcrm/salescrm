@@ -154,28 +154,31 @@ const Leaderboard = () => {
         )
       )}
 
-      {/* Full Leaderboard Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900">Complete Rankings</h2>
+      {/* Full Leaderboard Table (Desktop) & Cards (Mobile) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="text-base font-bold text-gray-900">Complete Rankings</h2>
         </div>
-        <div className="overflow-x-auto">
+
+        {/* DESKTOP TABLE */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
+            <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4">Rank</th>
-                <th className="px-6 py-4">Salesperson</th>
-                <th className="px-6 py-4 text-center">Conversions</th>
-                <th className="px-6 py-4 text-center">Total Leads</th>
-                <th className="px-6 py-4 text-center">Conversion Rate</th>
-                <th className="px-6 py-4 text-right">Revenue Generated</th>
+                <th className="px-6 py-3">Rank</th>
+                <th className="px-6 py-3">Salesperson</th>
+                <th className="px-6 py-3 text-center">Conversions</th>
+                <th className="px-6 py-3 text-center">Total Leads</th>
+                <th className="px-6 py-3 text-center">Conversion Rate</th>
+                <th className="px-6 py-3 text-right">Revenue Generated</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {leaderboard.map((item, index) => {
                 const rank = index + 1;
+                const isCurrentUser = user?.id && String(user.id) === String(item.id);
                 return (
-                  <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors ${isCurrentUser ? 'bg-primary-50/60 font-semibold' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
                         <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border ${getMedalColor(rank)}`}>
@@ -184,7 +187,12 @@ const Leaderboard = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-semibold text-gray-900">{item.name}</div>
+                      <div className="font-semibold text-gray-900 flex items-center gap-1.5">
+                        <span>{item.name}</span>
+                        {isCurrentUser && (
+                          <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-primary-600 text-white">YOU</span>
+                        )}
+                      </div>
                       <div className="text-xs text-gray-500">{item.email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-green-600">
@@ -213,6 +221,49 @@ const Leaderboard = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* MOBILE CARDS */}
+        <div className="md:hidden space-y-2.5 p-3 bg-gray-50/50">
+          {leaderboard.map((item, index) => {
+            const rank = index + 1;
+            const isCurrentUser = user?.id && String(user.id) === String(item.id);
+            return (
+              <div
+                key={item.id}
+                className={`p-3 bg-white rounded-xl shadow-sm border transition-all ${
+                  isCurrentUser ? 'border-primary-500 ring-2 ring-primary-500/20 bg-primary-50/30' : 'border-gray-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs border ${getMedalColor(rank)}`}>
+                      {rank}
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                        <span>{item.name}</span>
+                        {isCurrentUser && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-primary-600 text-white">YOU</span>
+                        )}
+                      </h3>
+                      <p className="text-[11px] text-gray-500">{item.closedLeads} conversions ({item.totalLeads > 0 ? ((item.closedLeads / item.totalLeads) * 100).toFixed(0) : 0}%)</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-black text-emerald-600 block">
+                      ₹{Number(item.revenue || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {leaderboard.length === 0 && !isLoading && (
+            <div className="p-6 text-center text-gray-400 text-xs">
+              No leaderboard data available.
+            </div>
+          )}
         </div>
       </div>
     </div>

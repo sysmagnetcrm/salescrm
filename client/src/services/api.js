@@ -12,7 +12,7 @@ const API_URL = (
   import.meta.env.VITE_API_URL ||
   devDefault ||
   inferredLocal ||
-  'https://crm.rmaoverseas.com/api'
+  'https://salescrm-7z2o.onrender.com/api'
 );
 
 if (import.meta.env?.DEV) {
@@ -154,6 +154,7 @@ export const settingsAPI = {
   removeLogo: () => api.delete('/settings/branding/logo'),
   removeFavicon: () => api.delete('/settings/branding/favicon'),
   resetBranding: () => api.post('/settings/branding/reset'),
+  getTelephonySettings: () => api.get('/settings/telephony'),
   getCountries: () => api.get('/settings/countries'),
   addCountry: (data) => api.post('/settings/countries', data),
   deleteCountry: (id) => api.delete(`/settings/countries/${id}`),
@@ -163,6 +164,42 @@ export const settingsAPI = {
   getStatuses: () => api.get('/settings/statuses'),
   addStatus: (data) => api.post('/settings/statuses', data),
   deleteStatus: (id) => api.delete(`/settings/statuses/${id}`)
+};
+
+// Centralized Unified CRM Calling Contract
+export const startCrmCall = async (lead) => {
+  if (!lead?.id || !lead?.phone) {
+    throw new Error('Invalid lead information for calling.');
+  }
+
+  if (window.AndroidCRM?.getCallCapability) {
+    const capability = window.AndroidCRM.getCallCapability();
+    console.log('[AndroidCRMBridge] Device call capability:', capability);
+  }
+
+  const res = await callAPI.logCall({
+    leadId: lead.id,
+    phoneNumber: lead.phone,
+    callStatus: 'initiated',
+    callDirection: 'outbound',
+    startedAt: new Date()
+  });
+
+  const callLogData = res.data?.data || res.data;
+  const callId = callLogData?.id || '';
+
+  if (callId && window.AndroidCRM?.startCallRecording) {
+    window.AndroidCRM.startCallRecording(callId);
+  }
+
+  if (window.AndroidCRM?.placeTelecomCall) {
+    window.AndroidCRM.placeTelecomCall(lead.phone, lead.id, callId);
+  } else {
+    const formattedPhone = String(lead.phone).replace(/[^0-9+]/g, '');
+    window.location.href = `tel:${formattedPhone}`;
+  }
+
+  return callLogData;
 };
 
 // Disposition APIs

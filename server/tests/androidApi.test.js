@@ -108,4 +108,75 @@ describe('Android Mobile API & Integration Test Suite', () => {
     assert.equal(json.success, true);
     assert.equal(json.data.callerUserId, androidUser.id);
   });
+
+  test('Call End is idempotent and handles repeated completion requests without error', async () => {
+    // Initiate call
+    const initRes = await fetch(`${baseURL}/api/calls`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${androidToken}`,
+        'x-client-version': '1.2.0'
+      },
+      body: JSON.stringify({
+        leadId: mobileLead.id,
+        phoneNumber: mobileLead.phone,
+        callStatus: 'initiated'
+      })
+    });
+    const initJson = await initRes.json();
+    const callId = initJson.data.id;
+
+    // End call first time
+    const endRes1 = await fetch(`${baseURL}/api/calls/${callId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${androidToken}`,
+        'x-client-version': '1.2.0'
+      },
+      body: JSON.stringify({ callStatus: 'completed', disposition: 'Interested', notes: 'Great call' })
+    });
+    assert.equal(endRes1.status, 200);
+
+    // Repeated End call request (Idempotent)
+    const endRes2 = await fetch(`${baseURL}/api/calls/${callId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${androidToken}`,
+        'x-client-version': '1.2.0'
+      },
+      body: JSON.stringify({ callStatus: 'completed', disposition: 'Interested' })
+    });
+    assert.equal(endRes2.status, 200);
+    const endJson2 = await endRes2.json();
+    assert.equal(endJson2.success, true);
+  });
+
+  test('Invalid transition from completed back to ringing is rejected with 400 Bad Request', async () => {
+    const initRes = await fetch(`${baseURL}/api/calls`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${androidToken}`,
+        'x-client-version': '1.2.0'
+      },
+      body: JSON.stringify({ leadId: mobileLead.id, phoneNumber: mobileLead.phone, callStatus: 'completed' })
+    });
+    const initJson = await initRes.json();
+    const callId = initJson.data.id;
+
+    // Attempt invalid transition back to ringing
+    const invalidRes = await fetch(`${baseURL}/api/calls/${callId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${androidToken}`,
+        'x-client-version': '1.2.0'
+      },
+      body: JSON.stringify({ callStatus: 'ringing' })
+    });
+    assert.equal(invalidRes.status, 400);
+  });
 });

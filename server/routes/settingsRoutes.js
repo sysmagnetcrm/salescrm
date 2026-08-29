@@ -18,10 +18,14 @@ import {
     uploadBrandingFavicon,
     removeBrandingLogo,
     removeBrandingFavicon,
-    resetBranding
+    resetBranding,
+    getTelephonySettings
 } from '../controllers/settingsController.js';
 
 const router = express.Router();
+
+// Admin Telephony Settings
+router.get('/telephony', protect, authorize('admin'), getTelephonySettings);
 
 // Public branding endpoint (for Login screen before auth)
 router.get('/branding/public', getPublicBranding);

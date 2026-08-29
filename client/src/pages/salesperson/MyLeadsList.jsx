@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { leadAPI, settingsAPI } from '../../services/api';
+import { leadAPI, settingsAPI, startCrmCall } from '../../services/api';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Phone, MessageCircle, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
@@ -57,6 +57,20 @@ const MyLeadsList = () => {
     startDate: null,
     endDate: null
   });
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  const queryFilters = {
+    ...filters,
+    search: debouncedSearch
+  };
+
   const [dateRange, setDateRange] = useState([null, null]);
   const [startDate, endDate] = dateRange;
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -98,10 +112,10 @@ const MyLeadsList = () => {
     staleTime: 300000
   });
 
-  // My Leads Query
-  const { data: leadsResponse, isLoading: loading } = useQuery({
-    queryKey: ['leads', 'my', filters],
-    queryFn: () => leadAPI.getMyLeads(filters).then(r => r.data),
+  // My Leads Query with debounced search filters
+  const { data: leadsResponse, isLoading: loading, isFetching } = useQuery({
+    queryKey: ['leads', 'my', queryFilters],
+    queryFn: () => leadAPI.getMyLeads(queryFilters).then(r => r.data),
     placeholderData: (prev) => prev,
     staleTime: 30000
   });
@@ -152,7 +166,7 @@ const MyLeadsList = () => {
       : <ArrowDown className="h-4 w-4 text-primary-600" />;
   };
 
-  const handleCall = (lead) => {
+  const handleCall = async (lead) => {
     setSelectedLead(lead);
     setCallData({
       note: '',
@@ -167,8 +181,12 @@ const MyLeadsList = () => {
     }));
     pendingCallRestored.current = true;
     setShowCallModal(true);
-    // Initiate actual call with country code (default +91)
-    window.location.href = `tel:${ensureE164(lead.phone, lead.country)}`;
+
+    try {
+      await startCrmCall(lead);
+    } catch (err) {
+      console.error('Unified CRM call error:', err);
+    }
   };
 
   const handleWhatsApp = (lead) => {
@@ -424,17 +442,25 @@ const MyLeadsList = () => {
         </div>
       </div>
 
-      {/* Sticky Status Tabs */}
-      <div className="sticky top-0 z-30 bg-gray-50 pt-2 pb-2 -mx-4 px-4 mb-2 shadow-sm md:static md:bg-transparent md:shadow-none md:p-0 md:mx-0 md:mb-4">
-        <div className="grid grid-cols-4 gap-2">
+      {/* Sticky Horizontal Scrollable Status Filter Bar */}
+      <div className="sticky top-14 z-30 bg-gray-50 pt-2 pb-2 -mx-3 px-3 mb-2 border-b border-gray-200/60 md:static md:bg-transparent md:border-0 md:p-0 md:mx-0 md:mb-4">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           {allTabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setFilters({ ...filters, status: tab.key })}
-              className={`inline-flex items-center justify-center w-full h-7 px-2 py-0 rounded-full font-medium transition-all text-[10px] whitespace-nowrap border ${filters.status === tab.key ? 'border-primary-500 bg-white' : 'border-transparent'
-                } ${tab.color}`}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full font-bold transition-all text-xs whitespace-nowrap border shrink-0 ${
+                filters.status === tab.key
+                  ? 'border-primary-600 bg-primary-600 text-white shadow-sm'
+                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-100'
+              }`}
             >
-              {tab.label} ({statusCounts[tab.key || 'all'] || 0})
+              <span>{tab.label}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                filters.status === tab.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {statusCounts[tab.key || 'all'] || 0}
+              </span>
             </button>
           ))}
         </div>
@@ -578,59 +604,53 @@ const MyLeadsList = () => {
               </div>
             </div>
 
-            <div className="md:hidden space-y-2">
+            <div className="md:hidden space-y-2.5">
               {sortedLeads.map((lead) => {
                 const styles = getRowStyles(lead.status);
                 return (
                   <div
                     key={lead.id}
-                    className={`px-3 py-2 flex items-center rounded-lg shadow-sm ${styles.card}`}
+                    className="p-3.5 bg-white rounded-xl shadow-sm border border-gray-200 space-y-2 hover:border-gray-300 transition-all cursor-pointer"
                     onClick={() => handleViewLead(lead)}
                   >
-                    <span
-                      className={`inline-block w-2.5 h-2.5 rounded-full mr-3 ${lead.status === 'fresh' ? 'bg-gray-400' :
-                        lead.status === 'follow-up' ? 'bg-orange-500' :
-                          lead.status === 'rnr' ? 'bg-purple-500' :
-                            lead.status === 'closed' ? 'bg-green-600' :
-                              lead.status === 'interested' ? 'bg-blue-500' : 'bg-red-500'
-                        }`}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
-                          {lead.name}
-                          {user?.name && (
-                            <span className="text-xs font-normal text-gray-600"> • {user.name}</span>
-                          )}
-                        </p>
-                        <div className="text-right">
-                          {lead.value !== null && lead.value !== undefined && !isNaN(Number(lead.value)) && (
-                            <span className={`text-[11px] font-medium whitespace-nowrap block ${lead.status === 'dead' || lead.status === 'cancelled' || lead.status === 'rejected' ? 'text-red-700' : 'text-green-700'}`}>
-                              {Number(lead.value).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-                            </span>
-                          )}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="text-sm font-bold text-gray-900 leading-snug">{lead.name}</h3>
+                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md uppercase ${getStatusColor(lead.status)}`}>
+                            {lead.status || 'FRESH'}
+                          </span>
                         </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {lead.product || 'Course'} • {lead.country || 'India'}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-gray-500 truncate">{lead.country}{lead.product ? ` • ${lead.product}` : ''}</p>
-                      <div className="text-[10px] text-gray-500 mt-0.5 truncate">
-                        Uploaded {lead.createdAt ? format(new Date(lead.createdAt), 'dd MMM yyyy') : '—'} • Last follow up: {lead.lastCalled ? format(new Date(lead.lastCalled), 'dd MMM yyyy') : '—'}
-                      </div>
+                      {lead.value !== null && lead.value !== undefined && !isNaN(Number(lead.value)) && Number(lead.value) > 0 && (
+                        <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
+                          ₹{Number(lead.value).toLocaleString('en-IN')}
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2 ml-3" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleCall(lead)}
-                        className="p-2 rounded-md bg-green-50 text-green-700 hover:bg-green-100"
-                        title="Call"
-                      >
-                        <Phone className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleWhatsApp(lead)}
-                        className="p-2 rounded-md bg-primary-100 text-primary-700 hover:bg-primary-200"
-                        title="WhatsApp"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                      </button>
+
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t border-gray-100">
+                      <span>Follow-up: {lead.nextFollowUpAt ? format(new Date(lead.nextFollowUpAt), 'MMM dd, HH:mm') : '—'}</span>
+                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <a
+                          href={`tel:${ensureE164(lead.phone, lead.country)}`}
+                          onClick={(e) => { e.stopPropagation(); handleCall(lead); }}
+                          className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold flex items-center gap-1 border border-gray-200"
+                        >
+                          <Phone className="h-3 w-3 text-gray-600" />
+                          <span>Call</span>
+                        </a>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleWhatsApp(lead); }}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold flex items-center gap-1 border border-emerald-200"
+                        >
+                          <MessageCircle className="h-3 w-3 text-emerald-600" />
+                          <span>WA</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

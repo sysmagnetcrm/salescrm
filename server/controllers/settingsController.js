@@ -1,4 +1,5 @@
 import { Country, Product, Status, Lead, AppBranding, Activity } from '../models/index.js';
+import { telephonyProvider } from '../services/telephonyProvider.js';
 
 // --- Helper: Seed Default Statuses ---
 const seedDefaultStatuses = async () => {
@@ -403,6 +404,18 @@ export const resetBranding = async (req, res) => {
         }
 
         res.status(200).json({ success: true, data: branding, message: 'Branding reset to default' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Get Telephony Settings status (Admin View)
+// @route   GET /api/settings/telephony
+// @access  Private/Admin
+export const getTelephonySettings = async (req, res) => {
+    try {
+        const status = telephonyProvider.getStatus();
+        res.status(200).json({ success: true, data: status });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
