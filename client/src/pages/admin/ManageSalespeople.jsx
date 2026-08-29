@@ -100,7 +100,7 @@ const ManageSalespeople = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const payload = { ...formData };
+    const payload = { ...formData, branch: branch || undefined };
     if (editingUser && !payload.password) {
       delete payload.password;
     }

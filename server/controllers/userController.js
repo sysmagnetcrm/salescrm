@@ -58,6 +58,8 @@ export const createSalesperson = async (req, res) => {
       });
     }
 
+    const targetBranch = (branch || req.user?.branch || 'kochi').toLowerCase();
+
     const user = await User.create({
       name: name.trim(),
       email: normalizedEmail,
@@ -66,7 +68,7 @@ export const createSalesperson = async (req, res) => {
       phone: phone ? String(phone).trim() : null,
       monthlyTarget: monthlyTarget && !isNaN(monthlyTarget) && Number(monthlyTarget) >= 0 ? Number(monthlyTarget) : 0,
       weeklyTarget: weeklyTarget && !isNaN(weeklyTarget) && Number(weeklyTarget) >= 0 ? Number(weeklyTarget) : 0,
-      branch: branch ? branch.toLowerCase() : 'main'
+      branch: targetBranch
     });
 
     const userResponse = user.toJSON();

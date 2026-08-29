@@ -78,6 +78,11 @@ export const connectDB = async () => {
     } catch (e) {
       // Ignore — column already exists
     }
+    try {
+      await sequelize.query("UPDATE \"Users\" SET branch = 'kochi' WHERE branch = 'main';");
+    } catch (e) {
+      // Ignore
+    }
     console.log('✅ Database synchronized');
   } catch (error) {
     console.error('❌ Database connection error:', error);
