@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { prefetchPostLoginData } from '../lib/queryClient';
 import loginBg from '../assets/loginBg.jpg';
 
 const Login = () => {
@@ -12,6 +14,7 @@ const Login = () => {
   const { login, loginWithPhone } = useAuth();
   const { appName, location, logoUrl } = useBranding();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,6 +31,9 @@ const Login = () => {
         ? await login({ email: id, password: credentials.password })
         : await loginWithPhone({ phone: id, password: credentials.password });
       
+      // Asynchronously trigger post-login prefetching without delaying navigation
+      prefetchPostLoginData(queryClient, user.role, user.branch);
+
       if (user.role === 'admin' || user.role === 'accountant') {
         navigate('/admin');
       } else {

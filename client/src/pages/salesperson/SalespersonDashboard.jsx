@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { dashboardAPI } from '../../services/api';
 import StatCard from '../../components/StatCard';
 import { ClipboardList, Phone, CheckCircle, XCircle, DollarSign, Target } from 'lucide-react';
@@ -6,37 +7,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
-let salespersonDashboardCache = null;
-
 const SalespersonDashboard = () => {
-  const [dashboardData, setDashboardData] = useState(salespersonDashboardCache || null);
-  const [loading, setLoading] = useState(!salespersonDashboardCache);
-
-  useEffect(() => {
-    fetchDashboard();
-  }, []);
-
-  const fetchDashboard = async () => {
-    try {
-      const response = await dashboardAPI.getSalespersonDashboard();
-      const data = response.data.data;
-      setDashboardData(data);
-      salespersonDashboardCache = data;
-    } catch (error) {
-      if (!salespersonDashboardCache) toast.error('Failed to load dashboard');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ['dashboard', 'salesperson'],
+    queryFn: () => dashboardAPI.getSalespersonDashboard().then(r => r.data.data || {}),
+    staleTime: 60000
+  });
 
   const { overview, monthly, weekly, recentCalls } = dashboardData || {};
 
@@ -53,149 +29,166 @@ const SalespersonDashboard = () => {
     }
   ];
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount || 0);
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
-        <p className="text-gray-600 mt-1">Track your performance and manage your leads</p>
+        <h1 className="text-2xl font-bold text-gray-900">My Performance Dashboard</h1>
+        <p className="text-sm text-gray-500">Track your leads, sales conversions, and activity metrics</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Leads"
-          value={overview?.totalLeads || 0}
-          icon={ClipboardList}
-          color="primary"
-        />
-        <StatCard
-          title="Follow-ups"
-          value={overview?.followUpLeads || 0}
-          icon={Phone}
-          color="orange"
-        />
-        <StatCard
-          title="Registered Leads"
-          value={overview?.closedLeads || 0}
-          icon={CheckCircle}
-          color="green"
-        />
-        <StatCard
-          title="Dead Leads"
-          value={overview?.deadLeads || 0}
-          icon={XCircle}
-          color="red"
-        />
-      </div>
+      {/* Overview Cards */}
+      {isLoading && !dashboardData ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-28 bg-gray-200 animate-pulse rounded-xl" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard
+            title="Total Assigned Leads"
+            value={overview?.totalLeads ?? 0}
+            icon={ClipboardList}
+            color="blue"
+          />
+          <StatCard
+            title="Follow-ups Today"
+            value={overview?.followUpsToday ?? 0}
+            icon={Phone}
+            color="yellow"
+          />
+          <StatCard
+            title="Total Registered Students"
+            value={overview?.closedLeads ?? 0}
+            icon={CheckCircle}
+            color="green"
+          />
+          <StatCard
+            title="Revenue Generated"
+            value={formatCurrency(overview?.totalRevenue)}
+            icon={DollarSign}
+            color="purple"
+          />
+        </div>
+      )}
 
-      {/* Performance Charts */}
+      {/* Target Progress & Chart Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Closings Target vs Achieved (Number of conversions) */}
-        <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Closings Target vs Achieved</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={performanceData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis allowDecimals={false} />
-              <Tooltip formatter={(value) => [`${value} conversions`, '']} />
-              <Legend />
-              <Bar dataKey="Target" fill="#94a3b8" name="Target (Closings)" />
-              <Bar dataKey="Achieved" fill="#10b981" name="Achieved (Closings)" />
-            </BarChart>
-          </ResponsiveContainer>
-          
-          <div className="mt-4 grid grid-cols-2 gap-4">
-            <div className="text-center p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-gray-600">Weekly Achievement</p>
-              <p className="text-2xl font-bold text-primary-600">{weekly?.achievement || 0}%</p>
+        {/* Weekly & Monthly Targets */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Target Achievement</h2>
+          <div className="space-y-6">
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="font-medium text-gray-700">Weekly Target Progress</span>
+                <span className="text-gray-900 font-bold">
+                  {weekly?.closedLeads || 0} / {weekly?.target || 0} Leads
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-primary-600 h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      ((weekly?.closedLeads || 0) / (weekly?.target || 1)) * 100
+                    )}%`
+                  }}
+                />
+              </div>
             </div>
-            <div className="text-center p-3 bg-green-50 rounded-lg">
-              <p className="text-sm text-gray-600">Monthly Achievement</p>
-              <p className="text-2xl font-bold text-green-600">{monthly?.achievement || 0}%</p>
+
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="font-medium text-gray-700">Monthly Target Progress</span>
+                <span className="text-gray-900 font-bold">
+                  {monthly?.closedLeads || 0} / {monthly?.target || 0} Leads
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-green-600 h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      ((monthly?.closedLeads || 0) / (monthly?.target || 1)) * 100
+                    )}%`
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Revenue Summary */}
-        <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Revenue Summary</h2>
-          <div className="space-y-4">
-            <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-green-700 font-medium">Monthly Revenue</p>
-                  <p className="text-3xl font-bold text-green-900 mt-1">
-                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(parseFloat(monthly?.revenue || 0))}
-                  </p>
-                  <p className="text-xs text-green-600 mt-1">
-                    Target: {parseInt(monthly?.target || 0)} conversions
-                  </p>
-                </div>
-                <DollarSign className="h-12 w-12 text-green-600" />
-              </div>
-            </div>
-
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">Weekly Revenue</p>
-                  <p className="text-3xl font-bold text-blue-900 mt-1">
-                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(parseFloat(weekly?.revenue || 0))}
-                  </p>
-                  <p className="text-xs text-blue-600 mt-1">
-                    Target: {parseInt(weekly?.target || 0)} conversions
-                  </p>
-                </div>
-                <Target className="h-12 w-12 text-blue-600" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">This Week</p>
-                <p className="text-xl font-bold text-gray-900">{weekly?.closedLeads || 0} Registered</p>
-              </div>
-              <div className="text-center p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">This Month</p>
-                <p className="text-xl font-bold text-gray-900">{monthly?.closedLeads || 0} Registered</p>
-              </div>
-            </div>
+        {/* Target vs Achievement Chart */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Target Comparison</h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={performanceData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="Target" fill="#E5E7EB" name="Assigned Target" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Achieved" fill="#2563EB" name="Conversions" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* Recent Calls */}
-      <div className="card">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Calls</h2>
-        {recentCalls && recentCalls.length > 0 ? (
-          <div className="space-y-3">
-            {recentCalls.map((lead) => (
-              <div key={lead.id} className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div>
-                  <h4 className="font-semibold text-gray-900">{lead.name}</h4>
-                  <p className="text-sm text-gray-600">{lead.phone}</p>
-                  {lead.country && (
-                    <p className="text-sm text-gray-500">{lead.country}</p>
-                  )}
-                  {lead.product && (
-                    <p className="text-sm text-gray-500">{lead.product}</p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-blue-700">
-                    {format(new Date(lead.lastCalled), 'MMM dd, yyyy')}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {format(new Date(lead.lastCalled), 'h:mm a')}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500 text-center py-8">No recent calls</p>
-        )}
+      {/* Recent Activity / Calls */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900">Recent Call Activity</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
+              <tr>
+                <th className="px-6 py-3">Date</th>
+                <th className="px-6 py-3">Lead</th>
+                <th className="px-6 py-3">Duration</th>
+                <th className="px-6 py-3">Outcome</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {(recentCalls || []).map((call) => (
+                <tr key={call.id} className="hover:bg-gray-50/50">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                    {call.createdAt ? format(new Date(call.createdAt), 'MMM dd, HH:mm') : 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 font-medium text-gray-900">
+                    {call.Lead?.name || 'Lead'}
+                  </td>
+                  <td className="px-6 py-4 text-gray-600">
+                    {call.duration} sec
+                  </td>
+                  <td className="px-6 py-4 font-semibold text-gray-700">
+                    {call.outcome || 'Logged'}
+                  </td>
+                </tr>
+              ))}
+              {(!recentCalls || recentCalls.length === 0) && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                    No recent calls logged.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

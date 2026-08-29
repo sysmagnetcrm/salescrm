@@ -27,20 +27,16 @@ const ensureE164 = (phone, country) => {
   return `${code}${digits}`;
 };
 
-const buildWhatsAppNumber = (phone, country) => ensureE164(phone, country).replace(/\D/g, '');
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const MyLeadsList = () => {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showCallModal, setShowCallModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({ country: 'India', product: '' });
-  const [countries, setCountries] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [statuses, setStatuses] = useState([]);
 
   const COLORS = {
     gray: { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-200', row: 'bg-white', hover: 'hover:bg-gray-50', card: 'bg-gray-100 border-gray-300' },
@@ -51,7 +47,7 @@ const MyLeadsList = () => {
     purple: { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200', row: 'bg-purple-50', hover: 'hover:bg-purple-100', card: 'bg-purple-100 border-purple-300' },
     indigo: { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-200', row: 'bg-indigo-50', hover: 'hover:bg-indigo-100', card: 'bg-indigo-50 border-indigo-300' },
     pink: { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200', row: 'bg-pink-50', hover: 'hover:bg-pink-100', card: 'bg-pink-50 border-pink-300' },
-    yellow: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-200', row: 'bg-yellow-50', hover: 'hover:bg-yellow-100', card: 'bg-yellow-50 border-yellow-300' }
+    yellow: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-200', row: 'bg-yellow-50', hover: 'hover:bg-yellow-100', card: 'bg-yellow-100 border-yellow-300' }
   };
   const [filters, setFilters] = useState({
     status: '',
@@ -83,60 +79,38 @@ const MyLeadsList = () => {
   });
   const pendingCallRestored = useRef(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchLeads();
-    }, 500);
+  // Metadata Queries
+  const { data: statuses = [] } = useQuery({
+    queryKey: ['statuses'],
+    queryFn: () => settingsAPI.getStatuses().then(r => r.data.data || []),
+    staleTime: 300000
+  });
 
-    return () => clearTimeout(timer);
-  }, [filters]);
+  const { data: countries = [] } = useQuery({
+    queryKey: ['countries'],
+    queryFn: () => settingsAPI.getCountries().then(r => (r.data.data || []).map(c => c.name)),
+    staleTime: 300000
+  });
 
-  useEffect(() => {
-    // Initial fetch for metadata (only once)
-    fetchStatuses();
-    fetchCountries();
-    fetchProducts();
-  }, []);
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => settingsAPI.getProducts().then(r => (r.data.data || []).map(p => p.name)),
+    staleTime: 300000
+  });
 
-  const fetchStatuses = async () => {
-    try {
-      const response = await settingsAPI.getStatuses();
-      setStatuses(response.data.data);
-    } catch (error) {
-      // fail silently
-    }
-  };
+  // My Leads Query
+  const { data: leadsResponse, isLoading: loading } = useQuery({
+    queryKey: ['leads', 'my', filters],
+    queryFn: () => leadAPI.getMyLeads(filters).then(r => r.data),
+    placeholderData: (prev) => prev,
+    staleTime: 30000
+  });
 
-  const fetchCountries = async () => {
-    try {
-      const response = await settingsAPI.getCountries();
-      setCountries(response.data.data.map(c => c.name));
-    } catch (error) {
-      // Silently fail
-    }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      const response = await settingsAPI.getProducts();
-      setProducts(response.data.data.map(p => p.name));
-    } catch (error) {
-      // Silently fail
-    }
-  };
-
-  const fetchLeads = async () => {
-    setLoading(true);
-    try {
-      const response = await leadAPI.getMyLeads(filters);
-      const rows = Array.isArray(response.data.data) ? response.data.data : [];
-      setLeads(rows.map((l) => ({ ...l, value: l.value !== undefined && l.value !== null ? Number(l.value) : l.value })));
-    } catch (error) {
-      toast.error('Failed to load leads');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const rawRows = Array.isArray(leadsResponse?.data) ? leadsResponse.data : [];
+  const leads = rawRows.map((l) => ({
+    ...l,
+    value: l.value !== undefined && l.value !== null ? Number(l.value) : l.value
+  }));
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -235,7 +209,8 @@ const MyLeadsList = () => {
       setSelectedLead(null);
       localStorage.removeItem('pendingCallLog');
       pendingCallRestored.current = false;
-      await fetchLeads();
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     } catch (error) {
       toast.error('Failed to log call');
     }

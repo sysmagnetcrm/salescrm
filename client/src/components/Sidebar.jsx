@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
+import { useBranch } from '../context/BranchContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { prefetchRouteQuery } from '../lib/queryClient';
 import {
   LayoutDashboard,
   Users,
@@ -18,10 +21,18 @@ import {
 } from 'lucide-react';
 
 const Sidebar = () => {
-  const { isAdmin, isAccountant } = useAuth();
+  const { isAdmin, isAccountant, user } = useAuth();
   const { appName, logoUrl } = useBranding();
+  const { branch } = useBranch();
+  const queryClient = useQueryClient();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const userRole = isAdmin ? 'admin' : (isAccountant ? 'accountant' : 'salesperson');
+
+  const handlePrefetch = (path) => {
+    prefetchRouteQuery(queryClient, path, userRole, branch);
+  };
 
   // Listen for global toggle event (dispatched from Navbar)
   useEffect(() => {
@@ -103,6 +114,8 @@ const Sidebar = () => {
                 <Link
                   key={link.to}
                   to={link.to}
+                  onMouseEnter={() => handlePrefetch(link.to)}
+                  onFocus={() => handlePrefetch(link.to)}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${isActive
                     ? 'bg-primary-600 text-white'

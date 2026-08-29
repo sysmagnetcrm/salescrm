@@ -1,306 +1,220 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { dashboardAPI } from '../services/api';
 import { Trophy, Award, TrendingUp, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useBranch } from '../context/BranchContext';
 
-let leaderboardCache = {};
-
 const Leaderboard = () => {
   const { branch } = useBranch();
   const [period, setPeriod] = useState('month');
-  const cacheKey = `${period}_${branch || 'all'}`;
-  const [leaderboard, setLeaderboard] = useState(leaderboardCache[cacheKey] || []);
-  const [loading, setLoading] = useState(!leaderboardCache[cacheKey]);
 
-  useEffect(() => {
-    fetchLeaderboard();
-  }, [period, branch]);
-
-  const fetchLeaderboard = async () => {
-    try {
-      const response = await dashboardAPI.getLeaderboard({ period, branch });
-      const data = response.data.data || [];
-      setLeaderboard(data);
-      leaderboardCache[`${period}_${branch || 'all'}`] = data;
-    } catch (error) {
-      if (!leaderboardCache[`${period}_${branch || 'all'}`]) toast.error('Failed to load leaderboard');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: leaderboard = [], isLoading } = useQuery({
+    queryKey: ['leaderboard', period, branch],
+    queryFn: () => dashboardAPI.getLeaderboard({ period, branch }).then(r => r.data.data || []),
+    staleTime: 120000
+  });
 
   const getMedalColor = (rank) => {
     switch (rank) {
       case 1:
-        return 'text-yellow-500';
+        return 'text-yellow-500 bg-yellow-50 border-yellow-200';
       case 2:
-        return 'text-gray-400';
+        return 'text-gray-400 bg-gray-50 border-gray-200';
       case 3:
-        return 'text-orange-600';
+        return 'text-amber-600 bg-amber-50 border-amber-200';
       default:
-        return 'text-gray-300';
+        return 'text-gray-600 bg-gray-50 border-gray-100';
     }
   };
 
   const getMedalIcon = (rank) => {
-    if (rank === 1) return '🏆';
-    if (rank === 2) return '🥈';
-    if (rank === 3) return '🥉';
-    return `#${rank}`;
+    switch (rank) {
+      case 1:
+        return <Trophy className="h-6 w-6 text-yellow-500" />;
+      case 2:
+        return <Award className="h-6 w-6 text-gray-400" />;
+      case 3:
+        return <Award className="h-6 w-6 text-amber-600" />;
+      default:
+        return <Star className="h-5 w-5 text-gray-400" />;
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
-  const topPerformer = leaderboard[0];
-
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Leaderboard</h1>
-          <p className="text-sm md:text-base text-gray-600 mt-1">Top performing salespeople</p>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Trophy className="h-7 w-7 text-yellow-500" />
+            Sales Leaderboard
+          </h1>
+          <p className="text-sm text-gray-500">Top performers based on closed leads and conversions</p>
         </div>
 
-        <div className="flex gap-2">
+        {/* Period Selector */}
+        <div className="inline-flex p-1 bg-gray-100 rounded-lg">
           <button
             onClick={() => setPeriod('week')}
-            className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg font-medium transition-colors text-sm md:text-base ${period === 'week'
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              period === 'week'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
           >
-            This Week
+            Weekly
           </button>
           <button
             onClick={() => setPeriod('month')}
-            className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg font-medium transition-colors text-sm md:text-base ${period === 'month'
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              period === 'month'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
           >
-            This Month
+            Monthly
           </button>
         </div>
       </div>
 
-      {/* Star Performer */}
-      {topPerformer && topPerformer.isStarPerformer && (
-        <div className="card bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-yellow-400 p-3 md:p-4 rounded-full">
-                <Star className="h-8 w-8 md:h-12 md:w-12 text-white fill-current" />
+      {/* Top 3 Performers Cards */}
+      {isLoading && !leaderboard.length ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-44 bg-gray-200 animate-pulse rounded-2xl" />
+          ))}
+        </div>
+      ) : (
+        leaderboard.length >= 3 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* 2nd Place */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center relative overflow-hidden order-2 md:order-1">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gray-50 rounded-bl-full -z-0" />
+              <div className="p-3 bg-gray-100 rounded-full mb-3 z-10">
+                {getMedalIcon(2)}
               </div>
-              <div>
-                <h2 className="text-lg md:text-2xl font-bold text-gray-900">
-                  {period === 'week' ? 'Star of the Week' : 'Star of the Month'}
-                </h2>
-                <p className="text-base md:text-xl text-gray-700 mt-1">{topPerformer.name}</p>
-                <p className="text-xs md:text-sm text-gray-600 truncate max-w-[200px] md:max-w-none">{topPerformer.email}</p>
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">2nd Place</span>
+              <h3 className="text-lg font-bold text-gray-900 z-10">{leaderboard[1]?.name}</h3>
+              <p className="text-xs text-gray-500 mb-4">{leaderboard[1]?.email}</p>
+              <div className="w-full pt-4 border-t border-gray-100 grid grid-cols-2 gap-2 text-center">
+                <div>
+                  <p className="text-xs text-gray-500">Conversions</p>
+                  <p className="text-lg font-bold text-primary-600">{leaderboard[1]?.closedLeads}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Revenue</p>
+                  <p className="text-lg font-bold text-green-600">₹{Number(leaderboard[1]?.revenue || 0).toLocaleString('en-IN')}</p>
+                </div>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs md:text-sm text-gray-600">Total Revenue</p>
-              <p className="text-2xl md:text-4xl font-bold text-green-600">
-                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(parseFloat(topPerformer.revenue))}
-              </p>
-              <p className="text-xs md:text-sm text-gray-600 mt-1">
-                {topPerformer.closedLeads} deals closed
-              </p>
+
+            {/* 1st Place */}
+            <div className="bg-white p-6 rounded-2xl shadow-md border-2 border-yellow-200 flex flex-col items-center text-center relative overflow-hidden order-1 md:order-2 transform md:-translate-y-2">
+              <div className="absolute top-0 right-0 w-28 h-28 bg-yellow-50 rounded-bl-full -z-0" />
+              <div className="p-4 bg-yellow-100 rounded-full mb-3 z-10">
+                {getMedalIcon(1)}
+              </div>
+              <span className="text-xs font-bold uppercase tracking-wider text-yellow-600 mb-1">Champion</span>
+              <h3 className="text-xl font-bold text-gray-900 z-10">{leaderboard[0]?.name}</h3>
+              <p className="text-xs text-gray-500 mb-4">{leaderboard[0]?.email}</p>
+              <div className="w-full pt-4 border-t border-gray-100 grid grid-cols-2 gap-2 text-center">
+                <div>
+                  <p className="text-xs text-gray-500">Conversions</p>
+                  <p className="text-xl font-bold text-primary-600">{leaderboard[0]?.closedLeads}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Revenue</p>
+                  <p className="text-xl font-bold text-green-600">₹{Number(leaderboard[0]?.revenue || 0).toLocaleString('en-IN')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 3rd Place */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center relative overflow-hidden order-3">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-bl-full -z-0" />
+              <div className="p-3 bg-amber-100 rounded-full mb-3 z-10">
+                {getMedalIcon(3)}
+              </div>
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-600 mb-1">3rd Place</span>
+              <h3 className="text-lg font-bold text-gray-900 z-10">{leaderboard[2]?.name}</h3>
+              <p className="text-xs text-gray-500 mb-4">{leaderboard[2]?.email}</p>
+              <div className="w-full pt-4 border-t border-gray-100 grid grid-cols-2 gap-2 text-center">
+                <div>
+                  <p className="text-xs text-gray-500">Conversions</p>
+                  <p className="text-lg font-bold text-primary-600">{leaderboard[2]?.closedLeads}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Revenue</p>
+                  <p className="text-lg font-bold text-green-600">₹{Number(leaderboard[2]?.revenue || 0).toLocaleString('en-IN')}</p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )
       )}
 
-      {/* Leaderboard - Desktop Table */}
-      <div className="hidden md:block card">
+      {/* Full Leaderboard Table */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-900">Complete Rankings</h2>
+        </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rank
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Salesperson
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total Leads
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Registered Leads
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Conversion Rate
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Revenue
-                </th>
+                <th className="px-6 py-4">Rank</th>
+                <th className="px-6 py-4">Salesperson</th>
+                <th className="px-6 py-4 text-center">Conversions</th>
+                <th className="px-6 py-4 text-center">Total Leads</th>
+                <th className="px-6 py-4 text-center">Conversion Rate</th>
+                <th className="px-6 py-4 text-right">Revenue Generated</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {leaderboard.map((person) => (
-                <tr
-                  key={person.id}
-                  className={`${person.rank === 1
-                      ? 'bg-yellow-50'
-                      : person.rank === 2
-                        ? 'bg-gray-50'
-                        : person.rank === 3
-                          ? 'bg-orange-50'
-                          : ''
-                    } hover:bg-blue-50 transition-colors`}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <span className={`text-3xl ${getMedalColor(person.rank)}`}>
-                        {getMedalIcon(person.rank)}
+            <tbody className="divide-y divide-gray-100">
+              {leaderboard.map((item, index) => {
+                const rank = index + 1;
+                return (
+                  <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border ${getMedalColor(rank)}`}>
+                          {rank}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-semibold text-gray-900">{item.name}</div>
+                      <div className="text-xs text-gray-500">{item.email}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-green-600">
+                      {item.closedLeads}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-gray-600">
+                      {item.totalLeads}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                        {item.totalLeads > 0 ? ((item.closedLeads / item.totalLeads) * 100).toFixed(1) : 0}%
                       </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 flex items-center">
-                          {person.name}
-                          {person.isStarPerformer && (
-                            <Star className="h-4 w-4 text-yellow-500 ml-2 fill-current" />
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-500">{person.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 font-medium">{person.totalLeads}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-green-600">{person.closedLeads}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="text-sm font-medium text-gray-900">{person.conversionRate}%</div>
-                      <div className="ml-2 w-16 bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-green-500 h-2 rounded-full"
-                          style={{ width: `${Math.min(Math.max(parseFloat(person.conversionRate) || 0, 0), 100)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-gray-900">
-                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(parseFloat(person.revenue))}
-                    </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-gray-900">
+                      ₹{Number(item.revenue || 0).toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                );
+              })}
+              {leaderboard.length === 0 && !isLoading && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    No leaderboard data available.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
-
-        {leaderboard.length === 0 && (
-          <div className="text-center py-12">
-            <Trophy className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 text-lg">No data available for this period</p>
-          </div>
-        )}
       </div>
-
-      {/* Leaderboard - Mobile List */}
-      <div className="md:hidden card p-0 overflow-hidden">
-        {leaderboard.length === 0 ? (
-          <div className="text-center py-10">
-            <Trophy className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No data available for this period</p>
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {leaderboard.map((person) => (
-              <li key={person.id} className={`px-4 py-3 ${person.rank === 1
-                  ? 'bg-yellow-50'
-                  : person.rank === 2
-                    ? 'bg-gray-50'
-                    : person.rank === 3
-                      ? 'bg-orange-50'
-                      : 'bg-white'
-                }`}>
-                <div className="flex items-center gap-3">
-                  <span className={`text-2xl ${getMedalColor(person.rank)}`}>
-                    {getMedalIcon(person.rank)}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-gray-900 truncate">{person.name}</p>
-                      {person.isStarPerformer && (
-                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-600 truncate">{person.email}</p>
-                    <div className="mt-1 flex items-center justify-between text-xs">
-                      <span className="text-gray-700">Leads: <strong>{person.totalLeads}</strong></span>
-                      <span className="text-green-700">Registered: <strong>{person.closedLeads}</strong></span>
-                      <span className="text-gray-700">Conv: <strong>{parseFloat(person.conversionRate).toFixed(1)}%</strong></span>
-                      <span className="text-green-700 font-semibold">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(parseFloat(person.revenue))}</span>
-                    </div>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Performance Stats */}
-      {leaderboard.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="card bg-gradient-to-br from-green-50 to-green-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-700 font-medium">Total Revenue</p>
-                <p className="text-3xl font-bold text-green-900 mt-2">
-                  {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(leaderboard.reduce((sum, p) => sum + parseFloat(p.revenue), 0))}
-                </p>
-              </div>
-              <TrendingUp className="h-12 w-12 text-green-600" />
-            </div>
-          </div>
-
-          <div className="card bg-gradient-to-br from-blue-50 to-blue-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-700 font-medium">Total Registered Leads</p>
-                <p className="text-3xl font-bold text-blue-900 mt-2">
-                  {leaderboard.reduce((sum, p) => sum + p.closedLeads, 0)}
-                </p>
-              </div>
-              <Award className="h-12 w-12 text-blue-600" />
-            </div>
-          </div>
-
-          <div className="card bg-gradient-to-br from-purple-50 to-purple-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-purple-700 font-medium">Avg Conversion Rate</p>
-                <p className="text-3xl font-bold text-purple-900 mt-2">
-                  {(
-                    leaderboard.reduce((sum, p) => sum + parseFloat(p.conversionRate), 0) /
-                    leaderboard.length
-                  ).toFixed(2)}%
-                </p>
-              </div>
-              <Trophy className="h-12 w-12 text-purple-600" />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

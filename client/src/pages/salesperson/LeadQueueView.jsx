@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { leadAPI, paymentAPI, callAPI, dispositionAPI } from '../../services/api';
 import {
   Phone,
@@ -22,15 +23,31 @@ import {
 import toast from 'react-hot-toast';
 
 const LeadQueueView = () => {
-  const [queue, setQueue] = useState([]);
-  const [summary, setSummary] = useState({ missedCount: 0, todayCount: 0, freshCount: 0, totalQueueCount: 0 });
+  const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [activeBucket, setActiveBucket] = useState('all');
-  const [loading, setLoading] = useState(true);
   const [lastRefreshedAt, setLastRefreshedAt] = useState(new Date());
 
-  // Dynamic Dispositions
-  const [dispositions, setDispositions] = useState([]);
+  // Dynamic Dispositions Query
+  const { data: dispositions = [] } = useQuery({
+    queryKey: ['dispositions'],
+    queryFn: () => dispositionAPI.getDispositions().then(r => r.data.data || []),
+    staleTime: 300000
+  });
+
+  // Working Queue Query with silent 15s background polling
+  const { data: queueResponse, isLoading: loading, refetch: refetchQueue } = useQuery({
+    queryKey: ['leads', 'queue', activeBucket],
+    queryFn: () => leadAPI.getQueue({ bucket: activeBucket }).then(r => {
+      setLastRefreshedAt(new Date());
+      return r.data;
+    }),
+    staleTime: 15000,
+    refetchInterval: 15000
+  });
+
+  const queue = queueResponse?.data || [];
+  const summary = queueResponse?.queueSummary || { missedCount: 0, todayCount: 0, freshCount: 0, totalQueueCount: 0 };
 
   // Lead Working Form State
   const [status, setStatus] = useState('fresh');
@@ -52,50 +69,6 @@ const LeadQueueView = () => {
   const [paymentAmount, setPaymentAmount] = useState('1000');
   const [paymentRef, setPaymentRef] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
-
-  // Fetch Available Dispositions
-  useEffect(() => {
-    const fetchDispositionsList = async () => {
-      try {
-        const res = await dispositionAPI.getDispositions();
-        if (res.data?.success) {
-          setDispositions(res.data.data);
-        }
-      } catch (err) {
-        console.error('Failed to load disposition list:', err);
-      }
-    };
-    fetchDispositionsList();
-  }, []);
-
-  // Fetch Deterministic BDE Working Queue
-  const fetchQueue = useCallback(async (isBackground = false) => {
-    if (!isBackground) setLoading(true);
-    try {
-      const res = await leadAPI.getQueue({ bucket: activeBucket });
-      if (res.data?.success) {
-        const fetchedLeads = res.data.data || [];
-        setQueue(fetchedLeads);
-        if (res.data.queueSummary) {
-          setSummary(res.data.queueSummary);
-        }
-        setLastRefreshedAt(new Date());
-      }
-    } catch (err) {
-      if (!isBackground) toast.error('Failed to load lead working queue');
-    } finally {
-      if (!isBackground) setLoading(false);
-    }
-  }, [activeBucket]);
-
-  useEffect(() => {
-    fetchQueue(false);
-    // Background polling for reassignment & queue sync every 15s
-    const pollInterval = setInterval(() => {
-      fetchQueue(true);
-    }, 15000);
-    return () => clearInterval(pollInterval);
-  }, [fetchQueue]);
 
   const currentLead = queue[currentIndex] || null;
 
@@ -221,9 +194,11 @@ const LeadQueueView = () => {
           setCurrentIndex(prev => prev + 1);
         } else {
           toast.success('Queue processing complete!');
-          await fetchQueue(false);
+          await refetchQueue();
         }
       }
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     } catch (err) {
       const msg = err.response?.data?.message || 'Unable to save lead. Please retry.';
       setSaveError(msg);
@@ -258,10 +233,8 @@ const LeadQueueView = () => {
       if (res.data?.success) {
         toast.success(res.data.message);
         setPaymentRef('');
-        const updatedSummary = res.data.data?.leadSummary;
-        if (updatedSummary) {
-          setQueue(prev => prev.map((l, i) => i === currentIndex ? { ...l, ...updatedSummary } : l));
-        }
+        queryClient.invalidateQueries({ queryKey: ['leads'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to record payment');
@@ -270,11 +243,10 @@ const LeadQueueView = () => {
     }
   };
 
-  if (loading) {
+  if (loading && !queue.length) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 space-y-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        <p className="text-sm font-semibold text-gray-600">Loading BDE Sales Queue...</p>
+      <div className="p-12 text-center text-gray-400 animate-pulse font-medium">
+        Loading BDE Working Queue...
       </div>
     );
   }

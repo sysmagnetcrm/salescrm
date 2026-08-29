@@ -1,4 +1,6 @@
 import { createBrowserRouter, RouterProvider, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import { AuthProvider } from './context/AuthContext';
 import { BranchProvider } from './context/BranchContext';
 import { Toaster } from 'react-hot-toast';
@@ -35,37 +37,32 @@ const LocaleRedirect = () => {
   return <Navigate to={target} replace />;
 };
 
-// Shared layout for Admin
+// Persistent Application Shell — Navbar, Sidebar & Main Content Outlet stay mounted during route transitions
+const AppShell = () => (
+  <div className="min-h-screen bg-gray-50">
+    <Navbar />
+    <div className="flex pt-16">
+      <Sidebar />
+      <main className="flex-1 p-0 md:p-8">
+        <div className="w-full mx-auto max-w-[430px] md:max-w-none px-3 md:px-0">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  </div>
+);
+
+// Protected Admin Layout
 const AdminLayout = () => (
   <ProtectedRoute allowedRoles={['admin', 'accountant']}>
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="flex pt-16">
-        <Sidebar />
-        <main className="flex-1 p-0 md:p-8">
-          <div className="w-full mx-auto max-w-[430px] md:max-w-none px-3 md:px-0">
-            <Outlet />
-          </div>
-        </main>
-      </div>
-    </div>
+    <AppShell />
   </ProtectedRoute>
 );
 
-// Shared layout for Salesperson
+// Protected Salesperson Layout
 const SalespersonLayout = () => (
   <ProtectedRoute allowedRoles={['salesperson']}>
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="flex pt-16">
-        <Sidebar />
-        <main className="flex-1 p-0 md:p-8">
-          <div className="w-full mx-auto max-w-[430px] md:max-w-none px-3 md:px-0">
-            <Outlet />
-          </div>
-        </main>
-      </div>
-    </div>
+    <AppShell />
   </ProtectedRoute>
 );
 
@@ -110,15 +107,17 @@ const router = createBrowserRouter([
 
 function App() {
   return (
-    <AuthProvider>
-      <BranchProvider>
-        <Toaster position="top-right" />
-        <RouterProvider
-          router={router}
-          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-        />
-      </BranchProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BranchProvider>
+          <Toaster position="top-right" />
+          <RouterProvider
+            router={router}
+            future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          />
+        </BranchProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

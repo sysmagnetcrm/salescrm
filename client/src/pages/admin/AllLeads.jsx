@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadAPI, userAPI, settingsAPI } from '../../services/api';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -9,17 +10,13 @@ import toast from 'react-hot-toast';
 import { useBranch } from '../../context/BranchContext';
 
 const AllLeads = () => {
-  const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const pageSize = 50;
+  const queryClient = useQueryClient();
   const { branch } = useBranch();
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+
   const [selectedLead, setSelectedLead] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [countries, setCountries] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [salespeople, setSalespeople] = useState([]);
   const [assignTo, setAssignTo] = useState('');
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -33,8 +30,6 @@ const AllLeads = () => {
     assignedTo: '',
     notes: ''
   });
-  const [statusSummary, setStatusSummary] = useState({});
-  const [statuses, setStatuses] = useState([]);
 
   const COLORS = {
     gray: { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-200', row: 'bg-white', hover: 'hover:bg-gray-50', card: 'bg-gray-100 border-gray-300' },
@@ -71,13 +66,52 @@ const AllLeads = () => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [assignToSingle, setAssignToSingle] = useState('');
 
+  // Queries for lookups
+  const { data: statuses = [] } = useQuery({
+    queryKey: ['statuses'],
+    queryFn: () => settingsAPI.getStatuses().then(r => r.data.data || []),
+    staleTime: 300000
+  });
+
+  const { data: countries = [] } = useQuery({
+    queryKey: ['countries'],
+    queryFn: () => settingsAPI.getCountries().then(r => (r.data.data || []).map(c => c.name)),
+    staleTime: 300000
+  });
+
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => settingsAPI.getProducts().then(r => (r.data.data || []).map(p => p.name)),
+    staleTime: 300000
+  });
+
+  const { data: salespeople = [] } = useQuery({
+    queryKey: ['salespeople', branch],
+    queryFn: () => userAPI.getSalespeople({ branch }).then(r => r.data.data || []),
+    staleTime: 120000
+  });
+
+  // Main Leads Query with keepPreviousData for smooth pagination
+  const { data: leadsResponse, isLoading: loading, isFetching } = useQuery({
+    queryKey: ['leads', 'all', { filters, page, pageSize, branch }],
+    queryFn: () => leadAPI.getAllLeads({ ...filters, page, limit: pageSize, branch }).then(r => r.data),
+    placeholderData: (previousData) => previousData,
+    staleTime: 30000
+  });
+
+  const rawRows = Array.isArray(leadsResponse?.data) ? leadsResponse.data : [];
+  const leads = rawRows.map((l) => ({
+    ...l,
+    value: l.value !== undefined && l.value !== null ? Number(l.value) : l.value
+  }));
+  const total = leadsResponse?.count || 0;
+  const statusSummary = leadsResponse?.statusCounts || {};
+
   // Map common countries to dial codes. Fallback to +91 if unknown.
-  // Always use +91 as default country code
   const getDialCode = (country) => {
     return '+91';
   };
 
-  // Ensure E.164 format for tel: links (e.g., +919876543210)
   const ensureE164 = (phone, country) => {
     if (!phone) return '';
     const raw = String(phone).trim();
@@ -92,42 +126,9 @@ const AllLeads = () => {
     return `${code}${digits}`;
   };
 
-  // Build WhatsApp link number (digits only, must include country code, no plus)
   const buildWhatsAppNumber = (phone, country) => {
-    const e164 = ensureE164(phone, country); // +<digits>
-    return e164.replace(/\D/g, ''); // remove '+' for wa.me
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchLeads();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [filters, page]);
-
-  useEffect(() => {
-    fetchStatuses();
-    fetchCountries();
-    fetchProducts();
-    fetchSalespeople();
-  }, []);
-
-  const fetchStatuses = async () => {
-    try {
-      const response = await settingsAPI.getStatuses();
-      setStatuses(response.data.data);
-    } catch (error) {
-      // fail silently
-    }
-  };
-
-  const fetchCountries = async () => {
-    try {
-      const response = await settingsAPI.getCountries();
-      setCountries(response.data.data.map(c => c.name));
-    } catch (error) {
-      // Silently fail if no countries
-    }
+    const e164 = ensureE164(phone, country);
+    return e164.replace(/\D/g, '');
   };
 
   const handleBulkAssign = async () => {
@@ -144,7 +145,9 @@ const AllLeads = () => {
       toast.success(`Assigned ${selectedLeads.length} lead(s)`);
       setSelectedLeads([]);
       setAssignTo('');
-      fetchLeads();
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['tl-team'] });
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to assign leads');
     }
@@ -293,7 +296,8 @@ const AllLeads = () => {
         setLeads((prev) => prev.map((l) => (l.id === updated.id ? { ...l, ...updated, value: Number(updated.value) } : l)));
       }
       setShowModal(false);
-      fetchLeads();
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     } catch (error) {
       console.error('Update error:', error.response?.data || error.message);
       toast.error(error.response?.data?.message || 'Failed to update lead');
@@ -306,7 +310,8 @@ const AllLeads = () => {
         await leadAPI.deleteLead(leadId);
         toast.success('Lead deleted successfully');
         setShowModal(false);
-        fetchLeads();
+        queryClient.invalidateQueries({ queryKey: ['leads'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       } catch (error) {
         toast.error('Failed to delete lead');
       }
@@ -340,7 +345,8 @@ const AllLeads = () => {
         await Promise.all(selectedLeads.map(id => leadAPI.deleteLead(id)));
         toast.success(`${selectedLeads.length} lead(s) deleted successfully`);
         setSelectedLeads([]);
-        fetchLeads();
+        queryClient.invalidateQueries({ queryKey: ['leads'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       } catch (error) {
         toast.error('Failed to delete some leads');
       }
