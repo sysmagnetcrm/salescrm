@@ -8,9 +8,9 @@ let leaderboardCache = {};
 
 const Leaderboard = () => {
   const { branch } = useBranch();
+  const [period, setPeriod] = useState('month');
   const cacheKey = `${period}_${branch || 'all'}`;
   const [leaderboard, setLeaderboard] = useState(leaderboardCache[cacheKey] || []);
-  const [period, setPeriod] = useState('month');
   const [loading, setLoading] = useState(!leaderboardCache[cacheKey]);
 
   useEffect(() => {
@@ -22,9 +22,9 @@ const Leaderboard = () => {
       const response = await dashboardAPI.getLeaderboard({ period, branch });
       const data = response.data.data || [];
       setLeaderboard(data);
-      leaderboardCache[cacheKey] = data;
+      leaderboardCache[`${period}_${branch || 'all'}`] = data;
     } catch (error) {
-      if (!leaderboardCache[cacheKey]) toast.error('Failed to load leaderboard');
+      if (!leaderboardCache[`${period}_${branch || 'all'}`]) toast.error('Failed to load leaderboard');
     } finally {
       setLoading(false);
     }
