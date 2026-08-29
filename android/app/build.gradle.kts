@@ -16,6 +16,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
+        buildConfigField("String", "WEB_APP_URL", "\"https://salescrm-theta.vercel.app\"")
         buildConfigField("String", "API_BASE_URL", "\"https://salescrm-7z2o.onrender.com/api\"")
         buildConfigField("String", "CLIENT_VERSION", "\"1.2.0\"")
     }
@@ -23,11 +24,13 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
+            buildConfigField("String", "WEB_APP_URL", "\"https://salescrm-theta.vercel.app\"")
             buildConfigField("String", "API_BASE_URL", "\"https://salescrm-7z2o.onrender.com/api\"")
         }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("String", "WEB_APP_URL", "\"https://salescrm-theta.vercel.app\"")
             buildConfigField("String", "API_BASE_URL", "\"https://salescrm-7z2o.onrender.com/api\"")
         }
     }
