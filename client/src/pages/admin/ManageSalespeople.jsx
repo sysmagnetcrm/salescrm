@@ -5,10 +5,12 @@ import { UserPlus, Edit2, UserX, Trash2, BarChart2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useBranch } from '../../context/BranchContext';
 
+let salespeopleCache = null;
+
 const ManageSalespeople = () => {
   const { branch } = useBranch();
-  const [salespeople, setSalespeople] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [salespeople, setSalespeople] = useState(salespeopleCache || []);
+  const [loading, setLoading] = useState(!salespeopleCache);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const navigate = useNavigate();
@@ -28,9 +30,11 @@ const ManageSalespeople = () => {
   const fetchSalespeople = async () => {
     try {
       const response = await userAPI.getSalespeople({ branch });
-      setSalespeople(response.data.data);
+      const data = response.data.data || [];
+      setSalespeople(data);
+      salespeopleCache = data;
     } catch (error) {
-      toast.error('Failed to load salespeople');
+      if (!salespeopleCache) toast.error('Failed to load salespeople');
     } finally {
       setLoading(false);
     }

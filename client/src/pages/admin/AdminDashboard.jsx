@@ -7,36 +7,75 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import toast from 'react-hot-toast';
 import { useBranch } from '../../context/BranchContext';
 
+let adminDashboardCache = null;
+
 const AdminDashboard = () => {
   const { branch } = useBranch();
-  const [dashboardData, setDashboardData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(adminDashboardCache?.dashboardData || null);
+  const [loading, setLoading] = useState(!adminDashboardCache);
   const [isMobile, setIsMobile] = useState(false);
   const [targetPeriod, setTargetPeriod] = useState('month'); // 'week' | 'month'
-  const [targetsData, setTargetsData] = useState([]);
+  const [targetsData, setTargetsData] = useState(adminDashboardCache?.targetsData || []);
   const emptyCounts = { all: 0, fresh: 0, 'follow-up': 0, rnr: 0, closed: 0, dead: 0, cancelled: 0, rejected: 0 };
-  const [dailyCounts, setDailyCounts] = useState(emptyCounts);
-  const [monthlyCounts, setMonthlyCounts] = useState(emptyCounts);
-  const [weeklyCounts, setWeeklyCounts] = useState(emptyCounts);
+  const [dailyCounts, setDailyCounts] = useState(adminDashboardCache?.dailyCounts || emptyCounts);
+  const [monthlyCounts, setMonthlyCounts] = useState(adminDashboardCache?.monthlyCounts || emptyCounts);
+  const [weeklyCounts, setWeeklyCounts] = useState(adminDashboardCache?.weeklyCounts || emptyCounts);
 
   useEffect(() => {
-    fetchDashboard();
-    fetchStatusBoards();
+    fetchAllDashboardData();
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [branch]);
 
-  const fetchDashboard = async () => {
+  const fetchAllDashboardData = async () => {
     try {
-      const response = await dashboardAPI.getAdminDashboard({ branch });
-      const base = response.data.data || {};
-      setDashboardData(base);
-      // Build initial targets dataset for current period (defaults to month)
-      await buildTargets('month');
+      const [dashRes, lbRes, spRes, dRes, wRes, mRes] = await Promise.allSettled([
+        dashboardAPI.getAdminDashboard({ branch }),
+        dashboardAPI.getLeaderboard({ period: targetPeriod === 'week' ? 'week' : 'month', branch }),
+        userAPI.getSalespeople({ branch }),
+        dashboardAPI.getStatusCounts({ period: 'daily', branch }),
+        dashboardAPI.getStatusCounts({ period: 'weekly', branch }),
+        dashboardAPI.getStatusCounts({ period: 'monthly', branch })
+      ]);
+
+      let baseData = dashboardData;
+      if (dashRes.status === 'fulfilled') {
+        baseData = dashRes.value.data.data || {};
+        setDashboardData(baseData);
+      }
+
+      let mergedTargets = targetsData;
+      if (lbRes.status === 'fulfilled' && spRes.status === 'fulfilled') {
+        const leaderboard = lbRes.value.data?.data || [];
+        const salespeople = spRes.value.data?.data || [];
+        const conversionsById = new Map(leaderboard.map(r => [r.id, parseInt(r.closedLeads || 0)]));
+        mergedTargets = salespeople.map(u => ({
+          id: u.id,
+          name: u.name,
+          conversions: conversionsById.get(u.id) || 0,
+          target: parseInt((targetPeriod === 'week' ? u.weeklyTarget : u.monthlyTarget) || 0)
+        }));
+        mergedTargets.sort((a, b) => b.conversions - a.conversions);
+        setTargetsData(mergedTargets);
+      }
+
+      let dC = dailyCounts, wC = weeklyCounts, mC = monthlyCounts;
+      if (dRes.status === 'fulfilled') { dC = dRes.value?.data?.statusCounts || emptyCounts; setDailyCounts(dC); }
+      if (wRes.status === 'fulfilled') { wC = wRes.value?.data?.statusCounts || emptyCounts; setWeeklyCounts(wC); }
+      if (mRes.status === 'fulfilled') { mC = mRes.value?.data?.statusCounts || emptyCounts; setMonthlyCounts(mC); }
+
+      // Save to memory cache for instant future renders
+      adminDashboardCache = {
+        dashboardData: baseData,
+        targetsData: mergedTargets,
+        dailyCounts: dC,
+        weeklyCounts: wC,
+        monthlyCounts: mC
+      };
     } catch (error) {
-      toast.error('Failed to load dashboard');
+      if (!adminDashboardCache) toast.error('Failed to load dashboard');
       console.error(error);
     } finally {
       setLoading(false);

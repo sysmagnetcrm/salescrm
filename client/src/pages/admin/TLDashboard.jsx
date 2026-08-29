@@ -3,10 +3,12 @@ import { dashboardAPI, userAPI, leadAPI } from '../../services/api';
 import { Users, AlertTriangle, Clock, RefreshCw, Trophy, ArrowRightLeft, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+let tlDashboardCache = null;
+
 const TLDashboard = () => {
-  const [teamStats, setTeamStats] = useState([]);
-  const [salespeople, setSalespeople] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [teamStats, setTeamStats] = useState(tlDashboardCache?.teamStats || []);
+  const [salespeople, setSalespeople] = useState(tlDashboardCache?.salespeople || []);
+  const [loading, setLoading] = useState(!tlDashboardCache);
 
   // Reassignment Modal State
   const [selectedBDE, setSelectedBDE] = useState('');
@@ -19,22 +21,28 @@ const TLDashboard = () => {
   }, []);
 
   const fetchTLData = async () => {
-    setLoading(true);
     try {
       const [dashRes, salesRes] = await Promise.all([
         dashboardAPI.getAdminDashboard(),
         userAPI.getSalespeople()
       ]);
 
+      let stats = teamStats;
+      let sales = salespeople;
+
       if (dashRes.data?.success) {
-        setTeamStats(dashRes.data.data?.salespersonPerformance || []);
+        stats = dashRes.data.data?.salespersonPerformance || [];
+        setTeamStats(stats);
       }
 
       if (salesRes.data?.success) {
-        setSalespeople(salesRes.data.data || []);
+        sales = salesRes.data.data || [];
+        setSalespeople(sales);
       }
+
+      tlDashboardCache = { teamStats: stats, salespeople: sales };
     } catch (err) {
-      toast.error('Failed to load TL team dashboard');
+      if (!tlDashboardCache) toast.error('Failed to load TL team dashboard');
     } finally {
       setLoading(false);
     }

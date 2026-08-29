@@ -6,9 +6,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
+let salespersonDashboardCache = null;
+
 const SalespersonDashboard = () => {
-  const [dashboardData, setDashboardData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(salespersonDashboardCache || null);
+  const [loading, setLoading] = useState(!salespersonDashboardCache);
 
   useEffect(() => {
     fetchDashboard();
@@ -17,9 +19,11 @@ const SalespersonDashboard = () => {
   const fetchDashboard = async () => {
     try {
       const response = await dashboardAPI.getSalespersonDashboard();
-      setDashboardData(response.data.data);
+      const data = response.data.data;
+      setDashboardData(data);
+      salespersonDashboardCache = data;
     } catch (error) {
-      toast.error('Failed to load dashboard');
+      if (!salespersonDashboardCache) toast.error('Failed to load dashboard');
       console.error(error);
     } finally {
       setLoading(false);

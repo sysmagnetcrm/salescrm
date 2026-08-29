@@ -4,23 +4,27 @@ import { Trophy, Award, TrendingUp, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useBranch } from '../context/BranchContext';
 
+let leaderboardCache = {};
+
 const Leaderboard = () => {
   const { branch } = useBranch();
-  const [leaderboard, setLeaderboard] = useState([]);
+  const cacheKey = `${period}_${branch || 'all'}`;
+  const [leaderboard, setLeaderboard] = useState(leaderboardCache[cacheKey] || []);
   const [period, setPeriod] = useState('month');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!leaderboardCache[cacheKey]);
 
   useEffect(() => {
     fetchLeaderboard();
   }, [period, branch]);
 
   const fetchLeaderboard = async () => {
-    setLoading(true);
     try {
       const response = await dashboardAPI.getLeaderboard({ period, branch });
-      setLeaderboard(response.data.data);
+      const data = response.data.data || [];
+      setLeaderboard(data);
+      leaderboardCache[cacheKey] = data;
     } catch (error) {
-      toast.error('Failed to load leaderboard');
+      if (!leaderboardCache[cacheKey]) toast.error('Failed to load leaderboard');
     } finally {
       setLoading(false);
     }
