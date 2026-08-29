@@ -1,0 +1,11 @@
+date,name,email,phonenumber,country,product,status
+2025-10-01,John Doe,john@example.com,+1-555-0101,USA,Premium Plan,fresh
+2025-10-02,Jane Smith,,+1-555-0102,UK,Basic Plan,fresh
+2025-10-03,Michael Johnson,michael.j@startup.io,+1-555-0103,Canada,Enterprise Suite,follow-up
+2025-10-04,Sarah Williams,sarah.w@consulting.com,+1-555-0104,USA,Consulting Package,closed
+2025-10-05,David Brown,david.brown@retail.com,+1-555-0105,India,Retail Bundle,fresh
+2025-10-06,Emily Davis,emily.d@marketing.com,+1-555-0106,Australia,Marketing Toolkit,dead
+2025-10-07,Robert Miller,robert.m@finance.com,+1-555-0107,USA,Finance Pro,fresh
+2025-10-08,Lisa Anderson,lisa.a@healthcare.com,+1-555-0108,UK,Healthcare Suite,follow-up
+2025-10-09,James Wilson,james.w@education.com,+1-555-0109,Canada,Education Pack,fresh
+2025-10-10,Patricia Moore,patricia.m@legal.com,+1-555-0110,USA,Legal Essentials,fresh

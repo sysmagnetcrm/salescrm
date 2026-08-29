@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.*.local
+!.env.example
+
+
+# Build outputs
+dist/
+build/
+*/dist/
+*/build/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Uploads
+uploads/
+*.csv
+*.xlsx
+*.xls
+
+# Test coverage
+coverage/
+
+# Misc
+.cache/
+.parcel-cache/
+
+# Database files (IMPORTANT - DO NOT COMMIT)
+*.sqlite
+*.sqlite3
+*.db
+database.sqlite*
+server/database.sqlite*
+
+# Temporary/helper scripts
+server/fix_schema.js
+server/check_schema.js
+server/controllers/leadController_unassigned.js
+
+# Backup files
+*.backup
+*.bak
+index.css.bak
+
+# Allow checked-in sample CSVs despite the global CSV ignore
+!sample-*.csv

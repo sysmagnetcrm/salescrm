@@ -1,0 +1,90 @@
+====================================
+UPLOAD COMMANDS - Run in PowerShell
+====================================
+
+Step 1: Upload Client Files
+----------------------------
+cd d:\POPEYE\rma\client
+scp -r dist/* root@147.79.71.15:/var/www/crm/RMA/client/dist/
+
+Step 2: Upload Server .env
+---------------------------
+cd d:\POPEYE\rma
+scp server/.env.production root@147.79.71.15:/var/www/crm/RMA/server/.env
+
+Step 3: Upload Nginx Config
+----------------------------
+scp nginx-config-domain.conf root@147.79.71.15:/tmp/crm-nginx.conf
+
+Step 4: Upload VPS Setup Script
+--------------------------------
+scp vps-setup-domain.sh root@147.79.71.15:/tmp/vps-setup-domain.sh
+
+
+====================================
+VPS COMMANDS - Run after SSH
+====================================
+
+Step 1: SSH into VPS
+--------------------
+ssh root@147.79.71.15
+
+Step 2: Run Setup Script
+-------------------------
+chmod +x /tmp/vps-setup-domain.sh
+/tmp/vps-setup-domain.sh
+
+
+====================================
+MANUAL VPS COMMANDS (if script fails)
+====================================
+
+1. Copy Nginx config:
+   sudo cp /tmp/crm-nginx.conf /etc/nginx/sites-available/crm
+
+2. Install Certbot:
+   sudo apt update
+   sudo apt install -y certbot python3-certbot-nginx
+
+3. Get SSL certificate:
+   sudo certbot --nginx -d crm.rmaoverseas.com -d www.crm.rmaoverseas.com
+
+4. Restart services:
+   cd /var/www/crm/RMA/server
+   pm2 restart crm-backend
+   sudo nginx -t
+   sudo systemctl restart nginx
+
+5. Check status:
+   pm2 status
+   pm2 logs crm-backend --lines 30
+
+
+====================================
+LOGIN CREDENTIALS
+====================================
+
+URL: https://crm.rmaoverseas.com
+
+Email: admin@rmaoverseas.com
+Password: Rma.admin@123
+
+
+====================================
+IMPORTANT: DNS CONFIGURATION
+====================================
+
+Before SSL will work, configure DNS:
+
+Domain Registrar: rmaoverseas.com
+Add DNS Record:
+  Type: A
+  Name: crm
+  Value: 147.79.71.15
+  TTL: 3600
+
+Wait 5-30 minutes for DNS propagation.
+
+Check DNS:
+  ping crm.rmaoverseas.com
+  nslookup crm.rmaoverseas.com

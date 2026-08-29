@@ -1,0 +1,13 @@
+{
+  "name": "crm-android-companion",
+  "version": "1.2.0",
+  "description": "Academy Sales CRM Android Companion Mobile App",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test tests/androidApp.test.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0"
+  }
+}

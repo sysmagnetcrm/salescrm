@@ -1,0 +1,25 @@
+{
+  "name": "lead-distribution-crm",
+  "version": "1.0.0",
+  "description": "Full-stack Lead Distribution CRM System",
+  "main": "index.js",
+  "scripts": {
+    "install-all": "cd server && npm install && cd ../client && npm install",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "cd client && npm run build"
+  },
+  "keywords": [
+    "crm",
+    "lead-management",
+    "sales",
+    "react",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
