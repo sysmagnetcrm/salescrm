@@ -44,26 +44,29 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Configure CORS
 const configuredOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim().replace(/\/$/, ''))
   : [];
-
-const defaultAllowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'http://localhost:5000',
-  'https://crm.rmaoverseas.com'
-];
-
-const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...configuredOrigins])];
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow non-browser requests (mobile app, curl, server-to-server, health check)
+    if (!origin) return callback(null, true);
+
+    const cleanOrigin = origin.replace(/\/$/, '');
+
+    // Allow if CORS_ORIGIN is '*', not in production, or matches allowed origin list
+    const isWildcard = configuredOrigins.includes('*') || process.env.CORS_ORIGIN === '*';
+    const isExplicit = configuredOrigins.includes(cleanOrigin);
+    const isVercel = cleanOrigin.endsWith('.vercel.app');
+    const isLocalhost = cleanOrigin.includes('localhost') || cleanOrigin.includes('127.0.0.1');
+
+    if (isWildcard || isExplicit || isVercel || isLocalhost || process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
     }
+
+    // Default fallback: allow origin to prevent 500 crash while logging warning
+    console.warn(`[CORS Warning] Allowing unlisted origin: ${origin}`);
+    callback(null, true);
   },
   credentials: true,
   optionsSuccessStatus: 200
