@@ -220,6 +220,31 @@ class MainActivity : AppCompatActivity() {
         }
 
         @android.webkit.JavascriptInterface
+        fun requestDefaultDialer() {
+            runOnUiThread {
+                try {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        val roleManager = getSystemService(Context.ROLE_SERVICE) as? android.app.role.RoleManager
+                        if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_DIALER)) {
+                            if (!roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER)) {
+                                val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_DIALER)
+                                startActivity(intent)
+                            }
+                        }
+                    } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                        val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+                        val intent = Intent(android.telecom.TelecomManager.ACTION_CHANGE_DEFAULT_DIALER).apply {
+                            putExtra(android.telecom.TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
+                        }
+                        startActivity(intent)
+                    }
+                } catch (e: Exception) {
+                    openAppSettings()
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
         fun openNotificationListenerSettings() {
             runOnUiThread {
                 try {
@@ -323,6 +348,19 @@ class MainActivity : AppCompatActivity() {
                     val hasReadCallLog = androidx.core.content.ContextCompat.checkSelfPermission(
                         this@MainActivity, android.Manifest.permission.READ_CALL_LOG
                     ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                    // Launch Native In-Call CRM Dialer Activity
+                    try {
+                        val callUiIntent = Intent(this@MainActivity, com.academysales.crm.telecom.CrmCallActivity::class.java).apply {
+                            putExtra("callId", callId)
+                            putExtra("leadId", leadId)
+                            putExtra("phone", sanitized)
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        }
+                        startActivity(callUiIntent)
+                    } catch (e: Exception) {
+                        Log.w("MainActivity", "Could not launch CrmCallActivity: ${e.message}")
+                    }
 
                     if (hasCallPhone && hasReadCallLog) {
                         val intent = Intent(Intent.ACTION_CALL, uri).apply {
