@@ -20,7 +20,8 @@ import {
   Database,
   Building2,
   Zap,
-  CheckCircle2
+  CheckCircle2,
+  Activity
 } from 'lucide-react';
 
 const Sidebar = () => {
