@@ -4,9 +4,11 @@ import { dashboardAPI } from '../services/api';
 import { Trophy, Award, TrendingUp, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useBranch } from '../context/BranchContext';
+import { useAuth } from '../context/AuthContext';
 
 const Leaderboard = () => {
   const { branch } = useBranch();
+  const { user } = useAuth();
   const [period, setPeriod] = useState('month');
 
   const { data: leaderboard = [], isLoading } = useQuery({

@@ -854,7 +854,7 @@ export const getStaleLeads = async (req, res) => {
       createdAt: { [Op.lte]: fourDaysAgo }
     };
 
-    if (effectiveBranch) {
+    if (effectiveBranch && effectiveBranch !== 'all') {
       where.branch = effectiveBranch;
     }
 
