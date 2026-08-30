@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Shield, 
   CheckCircle2, 
@@ -18,6 +19,7 @@ import {
 import toast from 'react-hot-toast';
 
 const CrmCallSetupWizard = () => {
+  const navigate = useNavigate();
   const [diag, setDiag] = useState({
     brand: '',
     model: '',
@@ -317,23 +319,24 @@ const CrmCallSetupWizard = () => {
             : 'Grant essential permissions above to enable cellular call tracking.'}
         </p>
 
-        <a
-          href="/salesperson/queue"
+        <button
+          type="button"
+          onClick={() => {
+            if (!allHardGranted) {
+              toast.error('Please grant required telephony permissions first');
+              return;
+            }
+            navigate('/salesperson/queue');
+          }}
           className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-xs shadow-md transition-all ${
             allHardGranted
               ? 'bg-primary-600 hover:bg-primary-700 text-white shadow-primary-600/20'
               : 'bg-slate-200 text-slate-400 cursor-not-allowed'
           }`}
-          onClick={(e) => {
-            if (!allHardGranted) {
-              e.preventDefault();
-              toast.error('Please grant required telephony permissions first');
-            }
-          }}
         >
           <span>Open BDE Lead Queue</span>
           <ArrowRight className="h-4 w-4" />
-        </a>
+        </button>
       </div>
     </div>
   );

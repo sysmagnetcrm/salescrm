@@ -40,7 +40,19 @@ class MainActivity : AppCompatActivity() {
             override fun shouldInterceptRequest(
                 view: WebView?,
                 request: WebResourceRequest?
-            ) = request?.let { assetLoader.shouldInterceptRequest(it.url) }
+            ): android.webkit.WebResourceResponse? {
+                if (request == null) return null
+                val response = assetLoader.shouldInterceptRequest(request.url)
+                if (response != null) return response
+
+                // SPA Fallback: If requesting an appassets route without file extension (e.g. /salesperson/queue), serve index.html
+                val path = request.url.path ?: ""
+                if (request.url.host == "appassets.androidplatform.net" && !path.contains(".")) {
+                    val indexUri = Uri.parse("https://appassets.androidplatform.net/index.html")
+                    return assetLoader.shouldInterceptRequest(indexUri)
+                }
+                return null
+            }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString() ?: return false
@@ -52,13 +64,35 @@ class MainActivity : AppCompatActivity() {
                 if (url == null) return false
                 return handleUrlNavigation(view, url)
             }
+
+            override fun onReceivedError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                error: android.webkit.WebResourceError?
+            ) {
+                super.onReceivedError(view, request, error)
+                if (request?.isForMainFrame == true) {
+                    // Auto-recover from navigation/response errors by reloading index.html
+                    view?.loadUrl("https://appassets.androidplatform.net/index.html")
+                }
+            }
         }
 
         // Modern Android Hardware Back Button navigation handling
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (::webView.isInitialized && webView.canGoBack()) {
-                    webView.goBack()
+                if (::webView.isInitialized) {
+                    if (webView.canGoBack()) {
+                        webView.goBack()
+                    } else {
+                        val currentUrl = webView.url ?: ""
+                        if (!currentUrl.endsWith("index.html") && !currentUrl.endsWith("/")) {
+                            webView.loadUrl("https://appassets.androidplatform.net/index.html")
+                        } else {
+                            isEnabled = false
+                            onBackPressedDispatcher.onBackPressed()
+                        }
+                    }
                 } else {
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
