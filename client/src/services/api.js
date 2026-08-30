@@ -206,8 +206,9 @@ export const startCrmCall = async (lead) => {
     window.AndroidCRM.setServerConfig(apiBase, token);
   }
 
+  const leadName = lead.name || lead.studentName || lead.fullName || 'Academy CRM Lead';
   if (window.AndroidCRM?.placeTelecomCall) {
-    window.AndroidCRM.placeTelecomCall(lead.phone, lead.id, callId);
+    window.AndroidCRM.placeTelecomCall(lead.phone, lead.id, callId, leadName, token);
   } else {
     const formattedPhone = String(lead.phone).replace(/[^0-9+]/g, '');
     window.location.href = `tel:${formattedPhone}`;

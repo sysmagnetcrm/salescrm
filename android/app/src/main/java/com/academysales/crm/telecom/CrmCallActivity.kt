@@ -19,6 +19,7 @@ class CrmCallActivity : AppCompatActivity() {
         private const val TAG = "CrmCallActivity"
     }
 
+    private lateinit var tvInitials: TextView
     private lateinit var tvCallerName: TextView
     private lateinit var tvPhoneNumber: TextView
     private lateinit var tvCallState: TextView
@@ -61,77 +62,100 @@ class CrmCallActivity : AppCompatActivity() {
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
-        val leadName = intent.getStringExtra("leadName") ?: CrmInCallService.currentLeadId ?: "Academy CRM Lead"
+        var leadName = intent.getStringExtra("leadName")
         val rawPhone = intent.getStringExtra("phone") ?: CrmInCallService.currentPhoneNumber ?: ""
         val callId = intent.getStringExtra("callId") ?: CrmInCallService.currentCallLogId ?: ""
 
-        Log.d(TAG, "CrmCallActivity launched for leadName=$leadName, phone=$rawPhone, callId=$callId")
+        // Sanitize lead name to avoid raw UUID display
+        if (leadName.isNullOrEmpty() || leadName.matches(Regex("[0-9a-fA-F-]{30,}"))) {
+            leadName = "Academy CRM Lead"
+        }
 
-        // Build Modern Dark Sleek Slate In-Call UI Programmatically
+        val formattedPhone = formatDisplayPhone(rawPhone)
+        val initials = getInitials(leadName)
+
+        Log.d(TAG, "CrmCallActivity initialized for leadName=$leadName, phone=$formattedPhone, callId=$callId")
+
+        // Build Premium Dark Slate UI Programmatically
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(64, 120, 64, 96)
+            setPadding(48, 80, 48, 64)
             setBackgroundColor(0xFF0F172A.toInt()) // Deep Dark Slate #0F172A
         }
 
-        // Live Audio Recording Pill Indicator
+        // Live Audio & Telemetry Active Badge
         tvRecStatus = TextView(this).apply {
-            text = "🔴 LIVE RECORDING & TELEMETRY ACTIVE"
-            textSize = 11f
-            setTextColor(0xFFF43F5E.toInt()) // Rose
+            text = "🔴 CRM DIALER ACTIVE • REAL-TIME TELEMETRY"
+            textSize = 10f
+            setTextColor(0xFF38BDF8.toInt()) // Sky Blue
             gravity = Gravity.CENTER
-            setPadding(24, 12, 24, 12)
-            setBackgroundColor(0xFF881337.toInt()) // Dark Crimson
+            setPadding(20, 10, 20, 10)
+            setBackgroundColor(0xFF1E293B.toInt()) // Dark Slate
             typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+
+        // Initials Avatar Circle
+        tvInitials = TextView(this).apply {
+            text = initials
+            textSize = 36f
+            setTextColor(0xFF38BDF8.toInt()) // Sky Blue text
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            val size = 220
+            layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                setMargins(0, 40, 0, 24)
+                gravity = Gravity.CENTER
+            }
+            setBackgroundColor(0xFF1E293B.toInt()) // Slate Container
         }
 
         tvCallerName = TextView(this).apply {
             text = leadName
-            textSize = 26f
+            textSize = 28f
             setTextColor(0xFFF8FAFC.toInt())
             gravity = Gravity.CENTER
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, 48, 0, 8)
+            setPadding(0, 8, 0, 4)
         }
 
         tvPhoneNumber = TextView(this).apply {
-            text = if (rawPhone.isNotEmpty()) rawPhone else "Cellular SIM Call"
-            textSize = 16f
+            text = formattedPhone
+            textSize = 17f
             setTextColor(0xFF94A3B8.toInt())
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 48)
+            setPadding(0, 0, 0, 36)
         }
 
         tvCallState = TextView(this).apply {
-            text = "DIALING / RINGING..."
+            text = "DIALING CELLULAR..."
             textSize = 14f
-            setTextColor(0xFFF59E0B.toInt()) // Amber
+            setTextColor(0xFFF59E0B.toInt()) // Amber #F59E0B
             gravity = Gravity.CENTER
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, 0, 0, 16)
+            setPadding(0, 0, 0, 12)
         }
 
         tvTimer = TextView(this).apply {
             text = "00:00"
-            textSize = 44f
+            textSize = 46f
             setTextColor(0xFFF8FAFC.toInt())
             gravity = Gravity.CENTER
             typeface = android.graphics.Typeface.MONOSPACE
-            setPadding(0, 0, 0, 64)
+            setPadding(0, 0, 0, 48)
         }
 
         val buttonContainer = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(0, 24, 0, 48)
+            setPadding(0, 16, 0, 36)
         }
 
         btnMute = Button(this).apply {
-            text = "MUTE"
+            text = "MUTE 🎙️"
             textSize = 13f
             setTextColor(0xFFF8FAFC.toInt())
-            setBackgroundColor(0xFF334155.toInt()) // Slate
+            setBackgroundColor(0xFF334155.toInt())
             setOnClickListener {
                 isMuted = !isMuted
                 audioManager?.isMicrophoneMute = isMuted
@@ -141,10 +165,10 @@ class CrmCallActivity : AppCompatActivity() {
         }
 
         btnSpeaker = Button(this).apply {
-            text = "SPEAKER"
+            text = "SPEAKER 🔈"
             textSize = 13f
             setTextColor(0xFFF8FAFC.toInt())
-            setBackgroundColor(0xFF334155.toInt()) // Slate
+            setBackgroundColor(0xFF334155.toInt())
             setOnClickListener {
                 isSpeakerOn = !isSpeakerOn
                 audioManager?.isSpeakerphoneOn = isSpeakerOn
@@ -153,19 +177,19 @@ class CrmCallActivity : AppCompatActivity() {
             }
         }
 
-        val param = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+        val btnParam = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
             setMargins(12, 0, 12, 0)
         }
-        buttonContainer.addView(btnMute, param)
-        buttonContainer.addView(btnSpeaker, param)
+        buttonContainer.addView(btnMute, btnParam)
+        buttonContainer.addView(btnSpeaker, btnParam)
 
         btnEndCall = Button(this).apply {
             text = "☎ END CALL"
-            textSize = 16f
+            textSize = 17f
             setTextColor(0xFFFFFFFF.toInt())
-            setBackgroundColor(0xFFDC2626.toInt()) // Bright Red #DC2626
+            setBackgroundColor(0xFFDC2626.toInt()) // Red #DC2626
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(48, 28, 48, 28)
+            setPadding(48, 30, 48, 30)
             setOnClickListener {
                 Log.d(TAG, "User clicked END CALL on CrmCallActivity")
                 try {
@@ -179,6 +203,7 @@ class CrmCallActivity : AppCompatActivity() {
         }
 
         layout.addView(tvRecStatus)
+        layout.addView(tvInitials)
         layout.addView(tvCallerName)
         layout.addView(tvPhoneNumber)
         layout.addView(tvCallState)
@@ -192,6 +217,27 @@ class CrmCallActivity : AppCompatActivity() {
         CrmInCallService.activeCall?.let { call ->
             call.registerCallback(callCallback)
             updateUiForState(call.details.state)
+        }
+    }
+
+    private fun formatDisplayPhone(phone: String): String {
+        if (phone.isEmpty()) return "Cellular SIM Call"
+        val digits = phone.replace(Regex("[^0-9+]"), "")
+        return if (digits.length == 10) {
+            "+91 ${digits.substring(0, 5)} ${digits.substring(5)}"
+        } else if (digits.startsWith("+91") && digits.length == 13) {
+            "+91 ${digits.substring(3, 8)} ${digits.substring(8)}"
+        } else {
+            digits
+        }
+    }
+
+    private fun getInitials(name: String): String {
+        val parts = name.trim().split(" ").filter { it.isNotEmpty() }
+        return when {
+            parts.size >= 2 -> "${parts[0].first().uppercase()}${parts[1].first().uppercase()}"
+            parts.isNotEmpty() && parts[0].isNotEmpty() -> parts[0].take(2).uppercase()
+            else -> "AC"
         }
     }
 
@@ -216,7 +262,7 @@ class CrmCallActivity : AppCompatActivity() {
                 stopTimer()
                 handler.postDelayed({
                     if (!isFinishing) finish()
-                }, 1500)
+                }, 1200)
             }
         }
     }

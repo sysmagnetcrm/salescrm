@@ -318,16 +318,21 @@ class MainActivity : AppCompatActivity() {
 
         @android.webkit.JavascriptInterface
         fun startCrmCall(phoneNumber: String, leadId: String?, callId: String?) {
-            placeTelecomCall(phoneNumber, leadId, callId, null)
+            placeTelecomCall(phoneNumber, leadId, callId, null, null)
         }
 
         @android.webkit.JavascriptInterface
         fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?) {
-            placeTelecomCall(phoneNumber, leadId, callId, null)
+            placeTelecomCall(phoneNumber, leadId, callId, null, null)
         }
 
         @android.webkit.JavascriptInterface
         fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?, authToken: String?) {
+            placeTelecomCall(phoneNumber, leadId, callId, null, authToken)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?, leadName: String?, authToken: String?) {
             runOnUiThread {
                 try {
                     val sanitized = phoneNumber.replace(Regex("[^0-9+]"), "")
@@ -368,6 +373,7 @@ class MainActivity : AppCompatActivity() {
                         val callUiIntent = Intent(this@MainActivity, com.academysales.crm.telecom.CrmCallActivity::class.java).apply {
                             putExtra("callId", callId)
                             putExtra("leadId", leadId)
+                            putExtra("leadName", leadName)
                             putExtra("phone", sanitized)
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                         }

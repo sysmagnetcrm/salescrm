@@ -205,10 +205,22 @@ const LeadQueueView = () => {
     return `+${digits}`;
   };
 
+  const [showDefaultDialerModal, setShowDefaultDialerModal] = useState(false);
+
   // Start Call Handler
   const handleStartCall = async (phone) => {
     if (!currentLead || callState !== 'idle') return;
     const sanitized = String(phone).replace(/[^0-9+]/g, '');
+
+    // Check if CRM is Default Phone App on Android
+    if (window.AndroidCRM && typeof window.AndroidCRM.isDefaultDialerHeld === 'function') {
+      const isHeld = window.AndroidCRM.isDefaultDialerHeld();
+      if (!isHeld) {
+        setShowDefaultDialerModal(true);
+        return;
+      }
+    }
+
     setCalledPhone(sanitized);
     setCallState('initiating');
 
@@ -872,6 +884,61 @@ const LeadQueueView = () => {
               </button>
             </div>
           </div>
+
+          {/* DEFAULT DIALER MODAL POPUP */}
+          {showDefaultDialerModal && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 text-white shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-5 mx-auto">
+                  <PhoneCall className="w-7 h-7" />
+                </div>
+                
+                <h3 className="text-xl font-bold text-center text-slate-100 mb-2">
+                  Default Phone App Required
+                </h3>
+                
+                <p className="text-xs text-slate-400 text-center leading-relaxed mb-6">
+                  To place calls directly, track exact talk duration, and record call audio natively, <strong className="text-amber-300 font-semibold">Academy Sales CRM</strong> must be configured as your default phone app.
+                </p>
+
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDefaultDialerModal(false);
+                      if (window.AndroidCRM?.requestDefaultDialer) {
+                        window.AndroidCRM.requestDefaultDialer();
+                      }
+                    }}
+                    className="w-full py-3.5 px-4 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 text-xs font-black rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <PhoneCall className="w-4 h-4" />
+                    <span>SET AS DEFAULT PHONE APP</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDefaultDialerModal(false);
+                      navigate('/sales/crm-setup');
+                    }}
+                    className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>Open Telephony Setup Wizard</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowDefaultDialerModal(false)}
+                    className="w-full py-2 text-slate-500 hover:text-slate-400 text-[11px] font-medium text-center"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
