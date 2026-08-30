@@ -14,7 +14,8 @@ import {
   Sliders, 
   ArrowRight,
   FolderArchive,
-  ExternalLink
+  ExternalLink,
+  Eye
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -191,6 +192,21 @@ const CrmCallSetupWizard = () => {
       action: () => {
         if (window.AndroidCRM?.requestRuntimePermission) {
           window.AndroidCRM.requestRuntimePermission('android.permission.POST_NOTIFICATIONS');
+        } else {
+          window.AndroidCRM?.openAppSettings?.();
+        }
+      }
+    },
+    {
+      id: 'notif_listener',
+      title: 'Status Bar Live Call Listener',
+      category: 'soft',
+      icon: Eye,
+      desc: 'Truecaller-style status bar monitor. Detects live call connect/answer status from system phone dialer notifications.',
+      granted: true,
+      action: () => {
+        if (window.AndroidCRM?.openNotificationListenerSettings) {
+          window.AndroidCRM.openNotificationListenerSettings();
         } else {
           window.AndroidCRM?.openAppSettings?.();
         }

@@ -8,6 +8,8 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.CallLog
+import android.telephony.PhoneStateListener
+import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import java.io.OutputStreamWriter
@@ -28,9 +30,12 @@ object NativeCallMonitor {
     private var currentLeadId: String? = null
     private var currentPhone: String? = null
     private var startTimeMillis: Long = 0L
+    private var connectedAtMillis: Long = 0L
     @Volatile private var isMonitoring: Boolean = false
+    @Volatile private var hasDispatchedConnected: Boolean = false
 
     private var contentObserver: ContentObserver? = null
+    private var phoneStateListener: PhoneStateListener? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
     private val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
@@ -46,6 +51,8 @@ object NativeCallMonitor {
         currentLeadId = leadId
         currentPhone = normalizePhone(phone)
         startTimeMillis = System.currentTimeMillis()
+        connectedAtMillis = 0L
+        hasDispatchedConnected = false
         isMonitoring = true
 
         Log.d(TAG, "[NativeCallMonitor] Monitoring started for callId=$callId, phone=$currentPhone, startTime=$startTimeMillis")
@@ -72,7 +79,34 @@ object NativeCallMonitor {
             Log.e(TAG, "[ContentObserver] Failed to register ContentObserver: ${e.message}")
         }
 
-        // 2. High-Frequency 1-Second Poller
+        // 2. Register TelephonyManager Listener for Real-Time Offhook/Connected events
+        try {
+            val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+            val listener = object : PhoneStateListener() {
+                @Deprecated("Deprecated in Java")
+                override fun onCallStateChanged(state: Int, phoneNumber: String?) {
+                    super.onCallStateChanged(state, phoneNumber)
+                    when (state) {
+                        TelephonyManager.CALL_STATE_OFFHOOK -> {
+                            Log.d(TAG, "[PhoneStateListener] CALL_STATE_OFFHOOK detected (Call Active/Connected).")
+                            notifyCallConnectedFromNotification(context)
+                        }
+                        TelephonyManager.CALL_STATE_IDLE -> {
+                            Log.d(TAG, "[PhoneStateListener] CALL_STATE_IDLE detected (Call Line Disconnected).")
+                            executor.execute {
+                                checkCallLogForMatch(context)
+                            }
+                        }
+                    }
+                }
+            }
+            phoneStateListener = listener
+            telephonyManager?.listen(listener, PhoneStateListener.LISTEN_CALL_STATE)
+        } catch (e: Exception) {
+            Log.e(TAG, "[PhoneStateListener] Failed to register listener: ${e.message}")
+        }
+
+        // 3. High-Frequency 1-Second Poller
         pollFuture?.cancel(true)
         pollFuture = scheduler.scheduleAtFixedRate({
             if (isMonitoring) {
@@ -82,7 +116,7 @@ object NativeCallMonitor {
             }
         }, 1, 1, TimeUnit.SECONDS)
 
-        // 3. Safety Net 90-Second Timeout
+        // 4. Safety Net 90-Second Timeout
         timeoutFuture?.cancel(true)
         timeoutFuture = scheduler.schedule({
             mainHandler.post {
@@ -105,13 +139,41 @@ object NativeCallMonitor {
         }, 90, TimeUnit.SECONDS)
     }
 
+    fun notifyCallConnectedFromNotification(context: Context) {
+        if (!isMonitoring || hasDispatchedConnected) return
+        hasDispatchedConnected = true
+        connectedAtMillis = System.currentTimeMillis()
+        val callId = currentCallId ?: return
+
+        Log.d(TAG, "[NativeCallMonitor] Signal CONNECTED for callId=$callId from Notification/Telephony Listener.")
+        executor.execute {
+            sendBackendStateUpdate(
+                context = context,
+                callId = callId,
+                status = "connected",
+                talkDurationSeconds = 0,
+                lifecycleSeconds = 0,
+                callDate = connectedAtMillis,
+                reason = "TELEPHONY_OR_NOTIFICATION_CONNECTED"
+            )
+        }
+    }
+
+    fun notifyCallDisconnectedFromNotification(context: Context) {
+        if (!isMonitoring) return
+        Log.d(TAG, "[NativeCallMonitor] Signal DISCONNECTED from Notification Listener. Checking CallLog...")
+        executor.execute {
+            checkCallLogForMatch(context)
+        }
+    }
+
     fun endCall(context: Context, callId: String?) {
         val targetCallId = callId ?: currentCallId ?: return
         Log.d(TAG, "[NativeCallMonitor] endCall requested manually for callId=$targetCallId")
         executor.execute {
             checkCallLogForMatch(context)
             if (isMonitoring && currentCallId == targetCallId) {
-                val talkSecs = Math.max(0L, (System.currentTimeMillis() - startTimeMillis) / 1000L)
+                val talkSecs = Math.max(0L, (System.currentTimeMillis() - (if (connectedAtMillis > 0) connectedAtMillis else startTimeMillis)) / 1000L)
                 sendBackendStateUpdate(
                     context = context,
                     callId = targetCallId,
@@ -250,6 +312,18 @@ object NativeCallMonitor {
             }
         }
         contentObserver = null
+
+        phoneStateListener?.let {
+            try {
+                val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+                telephonyManager?.listen(it, PhoneStateListener.LISTEN_NONE)
+                Log.d(TAG, "[PhoneStateListener] Unregistered TelephonyManager listener")
+            } catch (e: Exception) {
+                Log.e(TAG, "[PhoneStateListener] Error unregistering listener: ${e.message}")
+            }
+        }
+        phoneStateListener = null
+
         currentCallId = null
         currentLeadId = null
         currentPhone = null
@@ -301,7 +375,7 @@ object NativeCallMonitor {
             conn.doOutput = true
 
             val endedAtMillis = callDate + (talkDurationSeconds * 1000L)
-            val connectedAtMillis = if (talkDurationSeconds > 0) callDate else null
+            val connectedAtMillis = if (talkDurationSeconds > 0 || status == "connected") callDate else null
 
             val json = JSONObject().apply {
                 put("callStatus", status)

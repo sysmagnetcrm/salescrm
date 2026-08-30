@@ -218,6 +218,20 @@ class MainActivity : AppCompatActivity() {
         }
 
         @android.webkit.JavascriptInterface
+        fun openNotificationListenerSettings() {
+            runOnUiThread {
+                try {
+                    val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS").apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    openAppSettings()
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
         fun requestBatteryOptimizationExemption() {
             runOnUiThread {
                 try {
