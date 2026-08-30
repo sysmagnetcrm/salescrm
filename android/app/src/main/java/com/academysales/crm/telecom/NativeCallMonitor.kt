@@ -28,13 +28,14 @@ object NativeCallMonitor {
     private var currentLeadId: String? = null
     private var currentPhone: String? = null
     private var startTimeMillis: Long = 0L
-    private var isMonitoring: Boolean = false
+    @Volatile private var isMonitoring: Boolean = false
 
     private var contentObserver: ContentObserver? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
     private val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     private var timeoutFuture: ScheduledFuture<*>? = null
+    private var pollFuture: ScheduledFuture<*>? = null
 
     fun startMonitoring(context: Context, callId: String?, leadId: String?, phone: String?) {
         if (callId.isNullOrEmpty() || phone.isNullOrEmpty()) return
@@ -47,13 +48,13 @@ object NativeCallMonitor {
         startTimeMillis = System.currentTimeMillis()
         isMonitoring = true
 
-        Log.d(TAG, "[ContentObserver] Registered for callId=$callId, phone=$currentPhone, startTime=$startTimeMillis")
+        Log.d(TAG, "[NativeCallMonitor] Monitoring started for callId=$callId, phone=$currentPhone, startTime=$startTimeMillis")
 
-        // 1. Register ContentObserver on CallLog.Calls.CONTENT_URI
+        // 1. ContentObserver on CallLog.Calls.CONTENT_URI
         val observer = object : ContentObserver(mainHandler) {
             override fun onChange(selfChange: Boolean, uri: Uri?) {
                 super.onChange(selfChange, uri)
-                Log.d(TAG, "[ContentObserver] CallLog.onChange triggered. Querying for matching call...")
+                Log.d(TAG, "[ContentObserver] CallLog.onChange triggered. Checking CallLog...")
                 executor.execute {
                     checkCallLogForMatch(context)
                 }
@@ -71,12 +72,22 @@ object NativeCallMonitor {
             Log.e(TAG, "[ContentObserver] Failed to register ContentObserver: ${e.message}")
         }
 
-        // 2. Safety Net: 90-Second Timeout
+        // 2. High-Frequency 1-Second Poller
+        pollFuture?.cancel(true)
+        pollFuture = scheduler.scheduleAtFixedRate({
+            if (isMonitoring) {
+                executor.execute {
+                    checkCallLogForMatch(context)
+                }
+            }
+        }, 1, 1, TimeUnit.SECONDS)
+
+        // 3. Safety Net 90-Second Timeout
         timeoutFuture?.cancel(true)
         timeoutFuture = scheduler.schedule({
             mainHandler.post {
                 if (isMonitoring && currentCallId == callId) {
-                    Log.w(TAG, "[ContentObserver] 90s Timeout reached for callId=$callId. Marking TIMEOUT_UNRESOLVED.")
+                    Log.w(TAG, "[NativeCallMonitor] 90s Timeout reached for callId=$callId.")
                     stopMonitoring(context)
                     executor.execute {
                         sendBackendStateUpdate(
@@ -94,7 +105,31 @@ object NativeCallMonitor {
         }, 90, TimeUnit.SECONDS)
     }
 
+    fun endCall(context: Context, callId: String?) {
+        val targetCallId = callId ?: currentCallId ?: return
+        Log.d(TAG, "[NativeCallMonitor] endCall requested manually for callId=$targetCallId")
+        executor.execute {
+            checkCallLogForMatch(context)
+            if (isMonitoring && currentCallId == targetCallId) {
+                val talkSecs = Math.max(0L, (System.currentTimeMillis() - startTimeMillis) / 1000L)
+                sendBackendStateUpdate(
+                    context = context,
+                    callId = targetCallId,
+                    status = "completed",
+                    talkDurationSeconds = talkSecs,
+                    lifecycleSeconds = talkSecs,
+                    callDate = startTimeMillis,
+                    reason = "MANUAL_UI_END_CALL"
+                )
+                mainHandler.post {
+                    stopMonitoring(context)
+                }
+            }
+        }
+    }
+
     private fun checkCallLogForMatch(context: Context) {
+        if (!isMonitoring) return
         val callId = currentCallId ?: return
         val targetPhone = currentPhone ?: return
         val toleranceMillis = 5000L // 5 seconds clock skew tolerance
@@ -102,7 +137,7 @@ object NativeCallMonitor {
 
         val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED
         if (!hasPerm) {
-            Log.w(TAG, "[ContentObserver] READ_CALL_LOG permission not granted.")
+            Log.w(TAG, "[NativeCallMonitor] READ_CALL_LOG permission not granted.")
             return
         }
 
@@ -134,11 +169,13 @@ object NativeCallMonitor {
                     val callDate = it.getLong(dateIdx)
 
                     val normalizedCallNumber = normalizePhone(num)
+                    val isPhoneMatch = normalizedCallNumber == targetPhone ||
+                        (normalizedCallNumber.length >= 7 && targetPhone.length >= 7 && 
+                          (normalizedCallNumber.endsWith(targetPhone) || targetPhone.endsWith(normalizedCallNumber)))
 
-                    if (normalizedCallNumber == targetPhone && callDate >= queryStartTime) {
-                        Log.d(TAG, "[ContentObserver] Found matching call log: rawNum=$num, type=$callType, duration=${callDuration}s, date=$callDate")
+                    if (isPhoneMatch && callDate >= queryStartTime) {
+                        Log.d(TAG, "[NativeCallMonitor] Found matching call log: rawNum=$num, type=$callType, duration=${callDuration}s, date=$callDate")
 
-                        // Determine call status strictly from Android CallLog type & duration
                         val finalStatus = when {
                             callType == CallLog.Calls.OUTGOING_TYPE && callDuration > 0 -> "completed"
                             callType == CallLog.Calls.OUTGOING_TYPE && callDuration == 0 -> "no-answer"
@@ -188,7 +225,7 @@ object NativeCallMonitor {
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "[ContentObserver] Error querying CallLog: ${e.message}")
+            Log.e(TAG, "[NativeCallMonitor] Error querying CallLog: ${e.message}")
         }
     }
 
@@ -202,6 +239,7 @@ object NativeCallMonitor {
         if (!isMonitoring) return
         isMonitoring = false
         timeoutFuture?.cancel(true)
+        pollFuture?.cancel(true)
 
         contentObserver?.let {
             try {

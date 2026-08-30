@@ -208,6 +208,9 @@ const LeadQueueView = () => {
         ringingAt: updatedLog?.ringingAt,
         connectedAt: updatedLog?.connectedAt
       });
+      if (window.AndroidCRM?.endCall && endingCallId) {
+        window.AndroidCRM.endCall(endingCallId);
+      }
       if (window.AndroidCRM?.stopAndUploadCallRecording && endingCallId) {
         const token = localStorage.getItem('token') || '';
         const uploadUrl = `${window.location.origin}/api/calls/${endingCallId}/upload-audio`;
