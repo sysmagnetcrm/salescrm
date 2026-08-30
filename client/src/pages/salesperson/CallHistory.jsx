@@ -62,15 +62,23 @@ const CallHistory = () => {
     }
   };
 
+  const resolveRecordingUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : 'https://salescrm-7z2o.onrender.com';
+    return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+
   const renderRecordingBadge = (call, isMobile = false) => {
     const status = call.recordingStatus || (call.recordingUrl ? 'available' : 'unavailable');
+    const audioUrl = resolveRecordingUrl(call.recordingUrl);
 
-    if (status === 'available' && call.recordingUrl) {
+    if (status === 'available' && audioUrl) {
       return (
         <div className="inline-flex items-center gap-2">
-          {!isMobile && <audio controls className="h-8 w-44" src={call.recordingUrl} />}
+          {!isMobile && <audio controls className="h-8 w-44" src={audioUrl} />}
           <a
-            href={call.recordingUrl}
+            href={audioUrl}
             target="_blank"
             rel="noreferrer"
             className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-200 flex items-center gap-1"
