@@ -135,6 +135,17 @@ const AllLeads = () => {
     return e164.replace(/\D/g, '');
   };
 
+  const getStatusRowStyles = (statusVal) => {
+    const s = (statuses || []).find(item => item.value === statusVal);
+    const colorKey = s?.color || 'gray';
+    return COLORS[colorKey] || COLORS.gray;
+  };
+
+  const getStatusPillClass = (statusVal) => {
+    const styles = getStatusRowStyles(statusVal);
+    return `${styles.bg} ${styles.text} ${styles.border}`;
+  };
+
   const handleBulkAssign = async () => {
     try {
       if (selectedLeads.length === 0) {

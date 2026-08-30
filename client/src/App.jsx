@@ -49,6 +49,7 @@ const LocaleRedirect = () => {
 
 import MobileBottomNav from './components/MobileBottomNav';
 import NetworkBanner from './components/NetworkBanner';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Persistent Application Shell — Navbar, Sidebar & Main Content Outlet stay mounted during route transitions
 const AppShell = () => (
@@ -59,7 +60,9 @@ const AppShell = () => (
       <Sidebar />
       <main className="flex-1 p-0 md:p-8 min-w-0 max-w-full overflow-x-hidden">
         <div className="w-full max-w-full px-2 sm:px-4 md:px-0">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
     </div>
@@ -130,8 +133,6 @@ const router = createBrowserRouter([
   // Catch-all
   { path: '*', element: <Navigate to="/login" replace /> }
 ]);
-
-import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   return (
