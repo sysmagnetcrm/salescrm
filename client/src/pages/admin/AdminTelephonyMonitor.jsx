@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Smartphone, RefreshCw, ShieldCheck, CheckCircle2, AlertCircle, Phone, Volume2, Clock, Users, Activity } from 'lucide-react';
+import { callAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 
 const formatSeconds = (sec) => {
@@ -43,13 +44,9 @@ const AdminTelephonyMonitor = () => {
   const fetchFleetStatus = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/calls/fleet-status', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const result = await res.json();
-      if (result.success) {
-        setData(result);
+      const result = await callAPI.getFleetStatus();
+      if (result.data?.success) {
+        setData(result.data);
         toast.success('Fleet status updated');
       }
     } catch (e) {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Smartphone, RefreshCw, ShieldCheck, CheckCircle2, AlertTriangle, XCircle, Filter, Activity } from 'lucide-react';
+import { callAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 
 const DeviceFleetPage = () => {
@@ -27,13 +28,9 @@ const DeviceFleetPage = () => {
   const fetchFleet = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/calls/fleet-status', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const result = await res.json();
-      if (result.success && result.fleet) {
-        setFleet(result.fleet.map(f => ({
+      const result = await callAPI.getFleetStatus();
+      if (result.data?.success && result.data?.fleet) {
+        setFleet(result.data.fleet.map(f => ({
           ...f,
           sdk: 'Android 16 (API 36)',
           oem: 'Xiaomi HyperOS 2',

@@ -127,7 +127,8 @@ export const callAPI = {
   getCallAIAnalysis: (id) => api.get(`/calls/${id}/analysis`),
   getUnmatchedCalls: () => api.get('/calls/unmatched'),
   reconcileUnmatchedCall: (id, leadId) => api.post(`/calls/unmatched/${id}/reconcile`, { leadId }),
-  getCallAnalytics: (timeframe) => api.get(`/calls/analytics?timeframe=${timeframe || 'today'}`)
+  getCallAnalytics: (timeframe) => api.get(`/calls/analytics?timeframe=${timeframe || 'today'}`),
+  getFleetStatus: () => api.get('/calls/fleet-status')
 };
 
 // System Version API
