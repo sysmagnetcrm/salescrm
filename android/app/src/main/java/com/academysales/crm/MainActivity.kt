@@ -324,6 +324,58 @@ class MainActivity : AppCompatActivity() {
         }
 
         @android.webkit.JavascriptInterface
+        fun requestRuntimePermission(permission: String) {
+            runOnUiThread {
+                try {
+                    androidx.core.app.ActivityCompat.requestPermissions(
+                        this@MainActivity,
+                        arrayOf(permission),
+                        1001
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun openAppSettings() {
+            runOnUiThread {
+                try {
+                    val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun openAllFilesAccessSettings() {
+            runOnUiThread {
+                try {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                            data = Uri.parse("package:$packageName")
+                        }
+                        startActivity(intent)
+                    } else {
+                        openAppSettings()
+                    }
+                } catch (e: Exception) {
+                    try {
+                        val intent = Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                        startActivity(intent)
+                    } catch (ex: Exception) {
+                        openAppSettings()
+                    }
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
         fun getDeviceDiagnostics(): String {
             val brand = android.os.Build.BRAND
             val model = android.os.Build.MODEL
@@ -335,6 +387,16 @@ class MainActivity : AppCompatActivity() {
             val hasPhonePerm = androidx.core.content.ContextCompat.checkSelfPermission(
                 this@MainActivity,
                 android.Manifest.permission.CALL_PHONE
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            val hasCallLogPerm = androidx.core.content.ContextCompat.checkSelfPermission(
+                this@MainActivity,
+                android.Manifest.permission.READ_CALL_LOG
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            val hasPhoneStatePerm = androidx.core.content.ContextCompat.checkSelfPermission(
+                this@MainActivity,
+                android.Manifest.permission.READ_PHONE_STATE
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
             val hasStorageAccess = if (sdk >= 30 && android.os.Environment.isExternalStorageManager()) {
@@ -370,8 +432,14 @@ class MainActivity : AppCompatActivity() {
             val queueLength = com.academysales.crm.telecom.CallEventQueueManager.getPendingQueueLength(this@MainActivity)
             val recCap = com.academysales.crm.telecom.CallRecordingCapabilityManager.getCapability(this@MainActivity).name
 
+            // Permission rationale flags (for detecting permanently denied / don't ask again state)
+            val showPhoneRationale = androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(this@MainActivity, android.Manifest.permission.CALL_PHONE)
+            val showCallLogRationale = androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(this@MainActivity, android.Manifest.permission.READ_CALL_LOG)
+            val showPhoneStateRationale = androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(this@MainActivity, android.Manifest.permission.READ_PHONE_STATE)
+            val showNotifRationale = if (sdk >= 33) androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(this@MainActivity, "android.permission.POST_NOTIFICATIONS") else false
+
             // Corrected audit logic reflecting Native Call Monitor architecture:
-            val callTrackingStatus = if (hasPhonePerm) "PASS" else "RESTRICTED"
+            val callTrackingStatus = if (hasPhonePerm && hasCallLogPerm && hasPhoneStatePerm) "PASS" else "RESTRICTED"
             val telecomAccessStatus = if (hasPhonePerm) "PASS" else "RESTRICTED"
             val defaultDialerStatus = if (isDialer) "PASS" else "SUPPORTED"
             val recordingCapStatus = if (recCap == "SUPPORTED") "SUPPORTED" else if (recCap == "RESTRICTED") "RESTRICTED" else "UNAVAILABLE"
@@ -389,6 +457,16 @@ class MainActivity : AppCompatActivity() {
                 "\"sdk\":$sdk," +
                 "\"manufacturer\":\"$manufacturer\"," +
                 "\"isXiaomi\":$isXiaomi," +
+                "\"hasCallPhone\":$hasPhonePerm," +
+                "\"hasReadCallLog\":$hasCallLogPerm," +
+                "\"hasReadPhoneState\":$hasPhoneStatePerm," +
+                "\"hasPostNotif\":$hasNotifPerm," +
+                "\"hasStorageAccess\":$hasStorageAccess," +
+                "\"isIgnoringBattery\":$isIgnoringBattery," +
+                "\"showPhoneRationale\":$showPhoneRationale," +
+                "\"showCallLogRationale\":$showCallLogRationale," +
+                "\"showPhoneStateRationale\":$showPhoneStateRationale," +
+                "\"showNotifRationale\":$showNotifRationale," +
                 "\"callTracking\":\"$callTrackingStatus\"," +
                 "\"telecomAccess\":\"$telecomAccessStatus\"," +
                 "\"defaultDialer\":\"$defaultDialerStatus\"," +
