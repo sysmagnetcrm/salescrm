@@ -4,9 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
@@ -19,34 +19,28 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        webView = WebView(this)
-        setContentView(webView)
-
-        val settings: WebSettings = webView.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.databaseEnabled = true
-        settings.useWideViewPort = true
-        settings.loadWithOverviewMode = true
-        settings.allowFileAccess = true
-        settings.allowContentAccess = true
-        settings.setSupportZoom(false)
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-
-        // Clear any old WebView cache or registered Service Workers from Vercel PWA
-        webView.clearCache(true)
-
+        // Secure AssetLoader to load offline Vite dist securely via virtual domain
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
 
-        // Register Native JavaScript Bridge for Controlled Android Capabilities
-        webView.addJavascriptInterface(AndroidCRMBridge(), "AndroidCRM")
+        webView = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.allowFileAccess = true
+            settings.allowContentAccess = true
+
+            // Attach native JS bridge object window.AndroidCRM
+            addJavascriptInterface(WebAppInterface(), "AndroidCRM")
+        }
+
+        setContentView(webView)
 
         webView.webViewClient = object : WebViewClient() {
-            override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-                return request?.url?.let { assetLoader.shouldInterceptRequest(it) }
-            }
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: WebResourceRequest?
+            ) = request?.let { assetLoader.shouldInterceptRequest(it.url) }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString() ?: return false
@@ -117,59 +111,102 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleUrlNavigation(view: WebView?, url: String): Boolean {
-        // Handle native telephony & external deep links
-        if (url.startsWith("tel:") || url.startsWith("whatsapp:") || url.startsWith("mailto:") || url.startsWith("intent:")) {
+        if (url.startsWith("tel:")) {
             try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                val intent = Intent(Intent.ACTION_CALL, Uri.parse(url))
                 startActivity(intent)
-                return true
             } catch (e: Exception) {
-                e.printStackTrace()
+                try {
+                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse(url))
+                    startActivity(intent)
+                } catch (ex: Exception) {
+                    ex.printStackTrace()
+                }
             }
+            return true
         }
-
-        // Allow navigation within the app assets domain
-        if (url.contains("appassets.androidplatform.net") || url.contains("salescrm-7z2o.onrender.com")) {
-            return false // Let WebView load internally
-        }
-
-        // Default: load inside WebView
         return false
     }
 
-    inner class AndroidCRMBridge {
-        @android.webkit.JavascriptInterface
-        fun getDeviceInfo(): String {
-            return "{\"os\":\"Android\",\"sdk\":${android.os.Build.VERSION.SDK_INT},\"model\":\"${android.os.Build.MODEL}\",\"brand\":\"${android.os.Build.BRAND}\"}"
-        }
+    inner class WebAppInterface {
 
         @android.webkit.JavascriptInterface
-        fun isDefaultDialer(): Boolean {
-            return com.academysales.crm.telecom.DialerRoleManager.isDefaultDialer(this@MainActivity)
-        }
-
-        @android.webkit.JavascriptInterface
-        fun requestDefaultDialer() {
+        fun requestRuntimePermission(permission: String) {
             runOnUiThread {
-                com.academysales.crm.telecom.DialerRoleManager.requestDefaultDialer(this@MainActivity)
+                try {
+                    androidx.core.app.ActivityCompat.requestPermissions(
+                        this@MainActivity,
+                        arrayOf(permission),
+                        102
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
 
         @android.webkit.JavascriptInterface
-        fun getCallCapability(): String {
-            val hasPhonePerm = androidx.core.content.ContextCompat.checkSelfPermission(
-                this@MainActivity,
-                android.Manifest.permission.CALL_PHONE
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            val isDialer = isDefaultDialer()
-
-            return "{\"telephonySupported\":true,\"phonePermissionGranted\":$hasPhonePerm,\"isDefaultDialer\":$isDialer,\"callingMethod\":\"native_telecom\"}"
+        fun openAppSettings() {
+            runOnUiThread {
+                try {
+                    val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.parse("package:$packageName")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
 
         @android.webkit.JavascriptInterface
-        fun setServerConfig(serverBaseUrl: String, authToken: String?) {
-            if (serverBaseUrl.isNotEmpty()) {
-                val cleanUrl = serverBaseUrl.trimEnd('/')
+        fun openAllFilesAccessSettings() {
+            checkAndRequestAllFilesAccess()
+        }
+
+        @android.webkit.JavascriptInterface
+        fun openXiaomiAutoStartSettings() {
+            runOnUiThread {
+                try {
+                    val intent = Intent().apply {
+                        component = android.content.ComponentName(
+                            "com.miui.securitycenter",
+                            "com.miui.permcenter.autostart.AutoStartManagementActivity"
+                        )
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    openAppSettings()
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun requestBatteryOptimizationExemption() {
+            runOnUiThread {
+                try {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                        val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:$packageName")
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        startActivity(intent)
+                    }
+                } catch (e: Exception) {
+                    openAppSettings()
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun setServerConfig(serverBaseUrl: String?, authToken: String?) {
+            if (!serverBaseUrl.isNullOrEmpty() && !serverBaseUrl.contains("androidplatform.net")) {
+                var cleanUrl = serverBaseUrl.trimEnd('/')
+                if (!cleanUrl.endsWith("/api")) {
+                    cleanUrl = "$cleanUrl/api"
+                }
                 com.academysales.crm.telecom.CrmInCallService.serverBaseUrl = cleanUrl
                 getSharedPreferences("crm_prefs", Context.MODE_PRIVATE)
                     .edit()
@@ -187,19 +224,32 @@ class MainActivity : AppCompatActivity() {
 
         @android.webkit.JavascriptInterface
         fun startCrmCall(phoneNumber: String, leadId: String?, callId: String?) {
-            placeTelecomCall(phoneNumber, leadId, callId)
+            placeTelecomCall(phoneNumber, leadId, callId, null)
         }
 
         @android.webkit.JavascriptInterface
         fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?) {
+            placeTelecomCall(phoneNumber, leadId, callId, null)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?, authToken: String?) {
             runOnUiThread {
                 try {
                     val sanitized = phoneNumber.replace(Regex("[^0-9+]"), "")
                     val uri = Uri.parse("tel:$sanitized")
 
+                    if (!authToken.isNullOrEmpty()) {
+                        getSharedPreferences("crm_prefs", Context.MODE_PRIVATE)
+                            .edit()
+                            .putString("auth_token", authToken)
+                            .apply()
+                        com.academysales.crm.telecom.CrmInCallService.userAuthToken = authToken
+                    }
+
                     com.academysales.crm.telecom.CrmInCallService.resetSession(callId, leadId, sanitized, "outbound")
-                    
-                    // Launch Foreground Service to ensure NativeCallMonitor stays alive in background
+
+                    // Launch Foreground Service to ensure NativeCallMonitor stays alive in background and watches CallLog
                     val monitorIntent = Intent(this@MainActivity, com.academysales.crm.telecom.CallMonitorService::class.java).apply {
                         putExtra("callId", callId)
                         putExtra("leadId", leadId)
@@ -214,7 +264,7 @@ class MainActivity : AppCompatActivity() {
                     val hasCallPhone = androidx.core.content.ContextCompat.checkSelfPermission(
                         this@MainActivity, android.Manifest.permission.CALL_PHONE
                     ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                    
+
                     val hasReadCallLog = androidx.core.content.ContextCompat.checkSelfPermission(
                         this@MainActivity, android.Manifest.permission.READ_CALL_LOG
                     ) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -276,127 +326,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         @android.webkit.JavascriptInterface
-        fun stopCallAgentService() {
-            com.academysales.crm.telecom.CallAgentService.stopService(this@MainActivity)
-        }
-
-        @android.webkit.JavascriptInterface
-        fun getCallMonitorStatus(): String {
-            val isRunning = com.academysales.crm.telecom.CallAgentService.isRunning
-            val queueLength = com.academysales.crm.telecom.CallEventQueueManager.getPendingQueueLength(this@MainActivity)
-            val isDialer = isDefaultDialer()
-            val activeCall = com.academysales.crm.telecom.CrmInCallService.activeCall != null
-            return "{\"serviceRunning\":$isRunning,\"offlineQueueLength\":$queueLength,\"isDefaultDialer\":$isDialer,\"hasActiveCall\":$activeCall}"
-        }
-
-        @android.webkit.JavascriptInterface
-        fun forceSyncQueue(serverBaseUrl: String, authToken: String?) {
-            com.academysales.crm.telecom.CallEventQueueManager.flushQueue(this@MainActivity, serverBaseUrl, authToken)
-        }
-
-        @android.webkit.JavascriptInterface
-        fun openAutoStartSettings() {
-            runOnUiThread {
-                try {
-                    val intent = Intent().apply {
-                        component = android.content.ComponentName(
-                            "com.miui.securitycenter",
-                            "com.miui.permcenter.autostart.AutoStartManagementActivity"
-                        )
-                    }
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    try {
-                        val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", packageName, null)
-                        }
-                        startActivity(intent)
-                    } catch (ex: Exception) {
-                        ex.printStackTrace()
-                    }
-                }
-            }
-        }
-
-        @android.webkit.JavascriptInterface
-        fun openBatteryOptimizationSettings() {
-            runOnUiThread {
-                try {
-                    val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:$packageName")
-                    }
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    try {
-                        val intent = Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                        startActivity(intent)
-                    } catch (ex: Exception) {
-                        ex.printStackTrace()
-                    }
-                }
-            }
-        }
-
-        @android.webkit.JavascriptInterface
-        fun requestRuntimePermission(permission: String) {
-            runOnUiThread {
-                try {
-                    androidx.core.app.ActivityCompat.requestPermissions(
-                        this@MainActivity,
-                        arrayOf(permission),
-                        1001
-                    )
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
-
-        @android.webkit.JavascriptInterface
-        fun openAppSettings() {
-            runOnUiThread {
-                try {
-                    val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.fromParts("package", packageName, null)
-                    }
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
-
-        @android.webkit.JavascriptInterface
-        fun openAllFilesAccessSettings() {
-            runOnUiThread {
-                try {
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                        val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                            data = Uri.parse("package:$packageName")
-                        }
-                        startActivity(intent)
-                    } else {
-                        openAppSettings()
-                    }
-                } catch (e: Exception) {
-                    try {
-                        val intent = Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                        startActivity(intent)
-                    } catch (ex: Exception) {
-                        openAppSettings()
-                    }
-                }
-            }
-        }
-
-        @android.webkit.JavascriptInterface
         fun getDeviceDiagnostics(): String {
             val brand = android.os.Build.BRAND
             val model = android.os.Build.MODEL
             val sdk = android.os.Build.VERSION.SDK_INT
             val manufacturer = android.os.Build.MANUFACTURER
-            val isXiaomi = manufacturer.lowercase().contains("xiaomi") || brand.lowercase().contains("xiaomi") || brand.lowercase().contains("redmi") || brand.lowercase().contains("poco")
-            val isDialer = isDefaultDialer()
+
+            val isXiaomi = manufacturer.equals("Xiaomi", ignoreCase = true) ||
+                brand.equals("Xiaomi", ignoreCase = true) ||
+                brand.equals("POCO", ignoreCase = true) ||
+                brand.equals("Redmi", ignoreCase = true)
+
+            val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+            val isDialer = telecomManager?.defaultDialerPackage == packageName
 
             val hasPhonePerm = androidx.core.content.ContextCompat.checkSelfPermission(
                 this@MainActivity,
@@ -413,9 +355,9 @@ class MainActivity : AppCompatActivity() {
                 android.Manifest.permission.READ_PHONE_STATE
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-            val hasStorageAccess = if (sdk >= 30 && android.os.Environment.isExternalStorageManager()) {
-                true
-            } else if (sdk >= 33) {
+            val hasStorageAccess = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                android.os.Environment.isExternalStorageManager()
+            } else if (android.os.Build.VERSION.SDK_INT >= 33) {
                 androidx.core.content.ContextCompat.checkSelfPermission(
                     this@MainActivity,
                     android.Manifest.permission.READ_MEDIA_AUDIO
@@ -494,27 +436,6 @@ class MainActivity : AppCompatActivity() {
                 "\"aiAvailability\":\"$aiStatus\"," +
                 "\"offlineQueueLength\":$queueLength" +
                 "}"
-        }
-
-        @android.webkit.JavascriptInterface
-        fun placeTelecomCall(phoneNumber: String, leadId: String, callId: String, authToken: String?) {
-            runOnUiThread {
-                try {
-                    val formatted = phoneNumber.replace(Regex("[^0-9+]"), "")
-                    com.academysales.crm.telecom.CrmInCallService.currentCallLogId = callId
-                    com.academysales.crm.telecom.CrmInCallService.currentPhoneNumber = formatted
-                    com.academysales.crm.telecom.CrmInCallService.userAuthToken = authToken
-
-                    val uri = Uri.parse("tel:$formatted")
-                    val intent = Intent(Intent.ACTION_CALL, uri).apply {
-                        putExtra("crm_lead_id", leadId)
-                        putExtra("crm_call_id", callId)
-                    }
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
         }
     }
 }

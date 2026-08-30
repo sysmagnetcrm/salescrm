@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { leadAPI, userAPI, settingsAPI } from '../../services/api';
+import { leadAPI, userAPI, settingsAPI, startCrmCall } from '../../services/api';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import LeadCard from '../../components/LeadCard';
@@ -592,14 +592,16 @@ const AllLeads = () => {
                 </div>
                 <div className="ml-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   {lead.phone && (
-                    <a
-                      href={`tel:${ensureE164(lead.phone, lead.country)}`}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startCrmCall(lead);
+                      }}
                       className="p-2 rounded-md bg-green-50 text-green-700 hover:bg-green-100"
-                      title="Call"
-                      onClick={(e) => e.stopPropagation()}
+                      title="Initiate CRM Call"
                     >
                       <Phone className="w-4 h-4" />
-                    </a>
+                    </button>
                   )}
                   {lead.phone && (
                     <a
@@ -960,12 +962,14 @@ const AllLeads = () => {
               </div>
               <div>
                 <p className="text-gray-500">Phone</p>
-                <a
-                  href={`tel:${ensureE164(selectedLead.phone, selectedLead.country)}`}
-                  className="font-semibold text-primary-600 hover:underline"
+                <button
+                  onClick={() => startCrmCall(selectedLead)}
+                  className="font-semibold text-primary-600 hover:underline flex items-center gap-1.5"
+                  title="Initiate CRM Call"
                 >
-                  {ensureE164(selectedLead.phone, selectedLead.country)}
-                </a>
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>{ensureE164(selectedLead.phone, selectedLead.country)}</span>
+                </button>
               </div>
               <div>
                 <p className="text-gray-500">Product</p>

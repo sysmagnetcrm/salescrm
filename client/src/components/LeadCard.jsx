@@ -24,6 +24,8 @@ const ensureE164 = (phone, country) => {
 
 const buildWhatsAppNumber = (phone, country) => ensureE164(phone, country).replace(/\D/g, '');
 
+import { startCrmCall } from '../services/api';
+
 const LeadCard = ({ lead, onClick }) => {
   const { user } = useAuth();
   const statusColors = {
@@ -46,9 +48,9 @@ const LeadCard = ({ lead, onClick }) => {
     rejected: 'Rejected'
   };
 
-  const handleCall = (e, phone, country) => {
+  const handleCall = (e) => {
     e.stopPropagation();
-    window.location.href = `tel:${ensureE164(phone, country)}`;
+    startCrmCall(lead);
   };
 
   const adv = lead?.value !== undefined && lead?.value !== null ? parseFloat(lead.value) : NaN;
@@ -101,13 +103,13 @@ const LeadCard = ({ lead, onClick }) => {
           {/* Mobile call/WhatsApp quick actions */}
           <div className="inline-flex lg:hidden items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
             {lead.phone && (
-              <a
-                href={`tel:${ensureE164(lead.phone, lead.country)}`}
+              <button
+                onClick={(e) => handleCall(e)}
                 className="p-1.5 rounded-full bg-white shadow border border-gray-200 text-gray-700 hover:bg-gray-50"
-                title="Call"
+                title="Initiate CRM Call"
               >
                 <Phone className="w-4 h-4" />
-              </a>
+              </button>
             )}
             {lead.phone && (
               <a

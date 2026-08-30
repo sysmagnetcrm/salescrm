@@ -623,14 +623,13 @@ const MyLeadsList = () => {
                     <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t border-gray-100">
                       <span>Follow-up: {lead.nextFollowUpAt ? format(new Date(lead.nextFollowUpAt), 'MMM dd, HH:mm') : '—'}</span>
                       <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        <a
-                          href={`tel:${ensureE164(lead.phone, lead.country)}`}
+                        <button
                           onClick={(e) => { e.stopPropagation(); handleCall(lead); }}
                           className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold flex items-center gap-1 border border-gray-200"
                         >
                           <Phone className="h-3 w-3 text-gray-600" />
                           <span>Call</span>
-                        </a>
+                        </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleWhatsApp(lead); }}
                           className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold flex items-center gap-1 border border-emerald-200"
@@ -863,9 +862,14 @@ const MyLeadsList = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Phone</p>
-                  <a href={`tel:${selectedLead.phone}`} className="font-semibold text-primary-600 hover:underline">
-                    {selectedLead.phone}
-                  </a>
+                  <button
+                    onClick={() => handleCall(selectedLead)}
+                    className="font-semibold text-primary-600 hover:underline flex items-center gap-1"
+                    title="Initiate CRM Call"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>{selectedLead.phone}</span>
+                  </button>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Product</p>
