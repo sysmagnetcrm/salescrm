@@ -773,23 +773,7 @@ const MyLeadsList = () => {
               </div>
 
               <div>
-                <label className="label">Country</label>
-                <select
-                  className="input-field"
-                  value={callData.country}
-                  onChange={(e) => setCallData({ ...callData, country: e.target.value })}
-                >
-                  <option value="">Select Country</option>
-                  {countries.map((country) => (
-                    <option key={country} value={country}>
-                      {country}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="label">Product</label>
+                <label className="label">Product (optional)</label>
                 <select
                   className="input-field"
                   value={callData.product}

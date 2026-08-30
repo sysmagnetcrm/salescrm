@@ -1058,38 +1058,20 @@ const AllLeads = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-                  <select
-                    className="input-field text-sm"
-                    value={updateData.country}
-                    onChange={(e) => setUpdateData({ ...updateData, country: e.target.value })}
-                  >
-                    <option value="">Select Country</option>
-
-                    {countries.map((country) => (
-                      <option key={country} value={country}>
-                        {country}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
-                  <select
-                    className="input-field text-sm"
-                    value={updateData.product}
-                    onChange={(e) => setUpdateData({ ...updateData, product: e.target.value })}
-                  >
-                    <option value="">Select Product</option>
-                    {products.map((product) => (
-                      <option key={product} value={product}>
-                        {product}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Product (optional)</label>
+                <select
+                  className="input-field text-sm"
+                  value={updateData.product}
+                  onChange={(e) => setUpdateData({ ...updateData, product: e.target.value })}
+                >
+                  <option value="">Select Product</option>
+                  {products.map((product) => (
+                    <option key={product} value={product}>
+                      {product}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {selectedLead.lastCalled && (
