@@ -33,6 +33,7 @@ object NativeCallMonitor {
     private var connectedAtMillis: Long = 0L
     @Volatile private var isMonitoring: Boolean = false
     @Volatile private var hasDispatchedConnected: Boolean = false
+    var webViewRef: java.lang.ref.WeakReference<android.webkit.WebView>? = null
 
     private var contentObserver: ContentObserver? = null
     private var phoneStateListener: PhoneStateListener? = null
@@ -401,6 +402,17 @@ object NativeCallMonitor {
             val code = conn.responseCode
             Log.d(TAG, "[NativeCallMonitor] PUT /api/calls/$callId -> $code (status=$status, duration=${talkDurationSeconds}s)")
             conn.disconnect()
+
+            mainHandler.post {
+                try {
+                    webViewRef?.get()?.evaluateJavascript(
+                        "window.onNativeCallStateChange && window.onNativeCallStateChange('$callId', '$status', $talkDurationSeconds);",
+                        null
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "[NativeCallMonitor] JS Bridge notify error: ${e.message}")
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "[NativeCallMonitor] Failed to dispatch state update: ${e.message}")
         }

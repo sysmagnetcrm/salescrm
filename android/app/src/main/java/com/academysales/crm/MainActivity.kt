@@ -109,6 +109,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        com.academysales.crm.telecom.NativeCallMonitor.webViewRef = java.lang.ref.WeakReference(webView)
+
         // Load offline bundled frontend via virtual secure origin
         webView.loadUrl("https://appassets.androidplatform.net/index.html")
     }

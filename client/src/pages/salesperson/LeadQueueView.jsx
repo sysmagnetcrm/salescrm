@@ -88,43 +88,88 @@ const LeadQueueView = () => {
     }
   }, [currentLead]);
 
-  // 1-second active call state polling effect for automatic Telecom disconnect detection
+  // 1-second active call state polling effect + Visibility/Focus re-fetch + Native Bridge JS listener
   useEffect(() => {
     let pollInterval;
-    if (activeCallId) {
-      pollInterval = setInterval(async () => {
-        try {
-          const res = await callAPI.getCallLog(activeCallId).catch(() => null);
-          const currentLog = res?.data?.data || res?.data;
-          if (currentLog) {
-            if (currentLog.callStatus === 'connected' && callState !== 'connected') {
-              setCallState('connected');
-            }
-            const terminalStatuses = ['completed', 'no-answer', 'busy', 'failed', 'cancelled'];
-            if (terminalStatuses.includes(currentLog.callStatus)) {
-              setCallState('idle');
-              setLastCompletedCall({
-                id: currentLog.id,
-                talkTimeSeconds: currentLog.durationSeconds || 0,
-                lifecycleSeconds: currentLog.lifecycleDurationSeconds || 0,
-                endedAt: currentLog.endedAt ? new Date(currentLog.endedAt) : new Date(),
-                phone: currentLog.phoneNumber || calledPhone,
-                callStatus: currentLog.callStatus
-              });
-              setActiveCallId(null);
-              if (currentLog.callStatus === 'completed') {
-                toast.success(`Call completed (${currentLog.durationSeconds || 0}s talk time)`);
-              } else {
-                toast.error(`Call ended: ${currentLog.callStatus.toUpperCase()} (0s talk time)`);
-              }
+
+    const checkCallStatus = async () => {
+      if (!activeCallId) return;
+      try {
+        const res = await callAPI.getCallLog(activeCallId).catch(() => null);
+        const currentLog = res?.data?.data || res?.data;
+        if (currentLog) {
+          if (currentLog.callStatus === 'connected' && callState !== 'connected') {
+            setCallState('connected');
+          }
+          const terminalStatuses = ['completed', 'no-answer', 'busy', 'failed', 'cancelled'];
+          if (terminalStatuses.includes(currentLog.callStatus)) {
+            setCallState('idle');
+            setLastCompletedCall({
+              id: currentLog.id,
+              talkTimeSeconds: currentLog.durationSeconds || 0,
+              lifecycleSeconds: currentLog.lifecycleDurationSeconds || 0,
+              endedAt: currentLog.endedAt ? new Date(currentLog.endedAt) : new Date(),
+              phone: currentLog.phoneNumber || calledPhone,
+              callStatus: currentLog.callStatus
+            });
+            setActiveCallId(null);
+            if (currentLog.callStatus === 'completed') {
+              toast.success(`Call completed (${currentLog.durationSeconds || 0}s talk time)`);
+            } else {
+              toast.error(`Call ended: ${currentLog.callStatus.toUpperCase()} (0s talk time)`);
             }
           }
-        } catch (e) {
-          // Silent polling error handling
         }
-      }, 1000);
+      } catch (e) {
+        // Silent error catch
+      }
+    };
+
+    if (activeCallId) {
+      // 1. Regular 1s polling interval
+      pollInterval = setInterval(checkCallStatus, 1000);
+
+      // 2. Instant re-check on App Visibility & Window Focus (switching back from native dialer)
+      const handleVisibilityOrFocus = () => {
+        if (document.visibilityState === 'visible') {
+          checkCallStatus();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.addEventListener('focus', handleVisibilityOrFocus);
+
+      // 3. Register direct Native Android JS Bridge Listener
+      window.onNativeCallStateChange = (incomingCallId, incomingStatus, durationSecs) => {
+        if (incomingCallId === activeCallId) {
+          if (incomingStatus === 'connected') {
+            setCallState('connected');
+          } else if (['completed', 'no-answer', 'busy', 'failed', 'cancelled'].includes(incomingStatus)) {
+            setCallState('idle');
+            setLastCompletedCall({
+              id: incomingCallId,
+              talkTimeSeconds: durationSecs || 0,
+              lifecycleSeconds: durationSecs || 0,
+              endedAt: new Date(),
+              phone: calledPhone,
+              callStatus: incomingStatus
+            });
+            setActiveCallId(null);
+            if (incomingStatus === 'completed') {
+              toast.success(`Call completed (${durationSecs || 0}s talk time)`);
+            } else {
+              toast.error(`Call ended: ${incomingStatus.toUpperCase()}`);
+            }
+          }
+        }
+      };
+
+      return () => {
+        clearInterval(pollInterval);
+        document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+        window.removeEventListener('focus', handleVisibilityOrFocus);
+        delete window.onNativeCallStateChange;
+      };
     }
-    return () => clearInterval(pollInterval);
   }, [activeCallId, calledPhone, callState]);
 
   // Call timer interval for live connected talk-time
