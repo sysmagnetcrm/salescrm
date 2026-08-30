@@ -1,4 +1,4 @@
-import { Lead, User, Activity, Status, AssignmentHistory } from '../models/index.js';
+import { Lead, User, Activity, Status, AssignmentHistory, CallLog } from '../models/index.js';
 import { Op } from 'sequelize';
 import sequelize from '../config/database.js';
 import { parseFile, deleteFile } from '../utils/fileParser.js';
@@ -204,7 +204,7 @@ export const uploadLeads = async (req, res) => {
 // @access  Private (Admin/Accountant/Salesperson)
 export const createLead = async (req, res) => {
   try {
-    const { name, phone, country, email, product, source, value, notes, date, assignedTo, branch } = req.body;
+    const { name, phone, country, email, product, source, value, notes, date, assignedTo, branch, referenceName, referenceNumber } = req.body;
 
     if (!name || !phone || !country) {
       return res.status(400).json({ success: false, message: 'Name, phone and country are required' });
@@ -240,6 +240,28 @@ export const createLead = async (req, res) => {
       assigned = req.user.id;
     }
 
+    const normInputPhone = normalizePhone(phone);
+    if (normInputPhone && assigned) {
+      const allLeadsWithPhone = await Lead.findAll({
+        include: [{ model: User, as: 'salesperson', attributes: ['id', 'name', 'email'] }]
+      });
+      const activeDuplicate = allLeadsWithPhone.find(l => l.assignedTo && normalizePhone(l.phone) === normInputPhone);
+
+      if (activeDuplicate) {
+        return res.status(409).json({
+          success: false,
+          code: 'DUPLICATE_ACTIVE_ASSIGNMENT',
+          message: 'Lead with this phone number is already actively assigned to another salesperson.',
+          existingLeadId: activeDuplicate.id,
+          assignedTo: activeDuplicate.salesperson ? {
+            id: activeDuplicate.salesperson.id,
+            name: activeDuplicate.salesperson.name,
+            email: activeDuplicate.salesperson.email
+          } : null
+        });
+      }
+    }
+
     const transaction = await sequelize.transaction();
     try {
       const created = await Lead.create({
@@ -254,7 +276,9 @@ export const createLead = async (req, res) => {
         date: date ? new Date(date) : new Date(),
         assignedTo: assigned,
         status: LEAD_STATUS.FRESH,
-        branch: leadBranch
+        branch: leadBranch,
+        referenceName: referenceName ? String(referenceName).trim() : null,
+        referenceNumber: referenceNumber ? String(referenceNumber).trim() : null
       }, { transaction });
 
       // Log Assignment History if assigned
@@ -326,6 +350,13 @@ export const getAllLeads = async (req, res) => {
       where.assignedTo = assignedTo;
     }
 
+    if (req.query.assignedStartDate && req.query.assignedEndDate) {
+      const aStart = new Date(req.query.assignedStartDate);
+      const aEnd = new Date(req.query.assignedEndDate);
+      if (aEnd.getHours() === 0) aEnd.setHours(23, 59, 59, 999);
+      where.assignedAt = { [Op.gte]: aStart, [Op.lte]: aEnd };
+    }
+
     if (country) {
       where.country = { [likeOp]: `%${country}%` };
     }
@@ -358,9 +389,28 @@ export const getAllLeads = async (req, res) => {
         as: 'salesperson',
         attributes: ['id', 'name', 'email']
       }],
-      order: [['createdAt', 'DESC']],
+      order: [['assignedAt', 'DESC'], ['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(offset)
+    });
+
+    // Item 4: Attach Call Count Aggregation per lead
+    const leadIds = rows.map(l => l.id);
+    const callCountMap = {};
+    if (leadIds.length > 0) {
+      const callCountsRaw = await CallLog.findAll({
+        attributes: ['leadId', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+        where: { leadId: { [Op.in]: leadIds } },
+        group: ['leadId'],
+        raw: true
+      });
+      callCountsRaw.forEach(c => { callCountMap[c.leadId] = parseInt(c.count) || 0; });
+    }
+
+    const rowsWithCallCount = rows.map(l => {
+      const plainObj = l.get({ plain: true });
+      plainObj.callCount = callCountMap[l.id] || 0;
+      return plainObj;
     });
 
     // Calculate status counts (ignoring status filter)
@@ -389,7 +439,7 @@ export const getAllLeads = async (req, res) => {
       count,
       totalPages: Math.ceil(count / limit),
       currentPage: parseInt(page),
-      data: rows,
+      data: rowsWithCallCount,
       statusCounts
     });
   } catch (error) {
@@ -406,12 +456,19 @@ export const getAllLeads = async (req, res) => {
 // @access  Private/Salesperson
 export const getMyLeads = async (req, res) => {
   try {
-    const { status, search, page = 1, limit = 50, country, source, product, date, startDate, endDate } = req.query;
+    const { status, search, page = 1, limit = 50, country, source, product, date, startDate, endDate, assignedStartDate, assignedEndDate } = req.query;
     const userId = req.user.id;
     const where = { assignedTo: userId };
 
     if (status) {
       where.status = normalizeStatus(status);
+    }
+
+    if (assignedStartDate && assignedEndDate) {
+      const aStart = new Date(assignedStartDate);
+      const aEnd = new Date(assignedEndDate);
+      if (aEnd.getHours() === 0) aEnd.setHours(23, 59, 59, 999);
+      where.assignedAt = { [Op.gte]: aStart, [Op.lte]: aEnd };
     }
 
     if (startDate && endDate) {
@@ -445,9 +502,27 @@ export const getMyLeads = async (req, res) => {
 
     const { count, rows } = await Lead.findAndCountAll({
       where,
-      order: [['createdAt', 'DESC']],
+      order: [['assignedAt', 'DESC'], ['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(offset)
+    });
+
+    const leadIds = rows.map(l => l.id);
+    const callCountMap = {};
+    if (leadIds.length > 0) {
+      const callCountsRaw = await CallLog.findAll({
+        attributes: ['leadId', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+        where: { leadId: { [Op.in]: leadIds } },
+        group: ['leadId'],
+        raw: true
+      });
+      callCountsRaw.forEach(c => { callCountMap[c.leadId] = parseInt(c.count) || 0; });
+    }
+
+    const rowsWithCallCount = rows.map(l => {
+      const plainObj = l.get({ plain: true });
+      plainObj.callCount = callCountMap[l.id] || 0;
+      return plainObj;
     });
 
     const countsWhere = { ...where };
@@ -475,7 +550,7 @@ export const getMyLeads = async (req, res) => {
       count,
       totalPages: Math.ceil(count / limit),
       currentPage: parseInt(page),
-      data: rows,
+      data: rowsWithCallCount,
       statusCounts
     });
   } catch (error) {
@@ -544,7 +619,7 @@ export const updateLead = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Lead not found' });
     }
 
-    const { status, disposition, notes, lastCalled, value, country, product, campus, nextFollowUpAt } = req.body;
+    const { status, disposition, notes, lastCalled, value, country, product, campus, nextFollowUpAt, referenceName, referenceNumber } = req.body;
 
     // Validate financial value
     let normalizedValue = lead.value;
@@ -565,6 +640,28 @@ export const updateLead = async (req, res) => {
     const oldCountry = lead.country || null;
     const targetStatus = status ? normalizeStatus(status) : lead.status;
     const now = new Date();
+
+    // ITEM 2: Payment-Gated Status Transition Guards
+    if (targetStatus === LEAD_STATUS.ADMISSION_DONE && (parseFloat(lead.admissionFeeAmount) < 1000 || lead.admissionFeeStatus !== 'cleared')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot set status to Admission Done. Requires minimum ₹1,000 admission fee payment recorded.'
+      });
+    }
+
+    if (targetStatus === LEAD_STATUS.ORIENTATION_DONE && (parseFloat(lead.orientationFeeAmount) < 8000 || parseFloat(lead.totalClearedPayment) < 9000)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot set status to Orientation Done. Requires minimum ₹8,000 orientation fee (₹9,000 total cleared payment).'
+      });
+    }
+
+    if (targetStatus === LEAD_STATUS.REGISTERED && (!lead.batchAllocationEligible || parseFloat(lead.totalClearedPayment) < 9000)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot set status to Registered / Batch Allocated. Minimum required cleared payment is ₹9,000.00.'
+      });
+    }
 
     const normalizedLastCalled = (lastCalled === '') ? null
       : (lastCalled !== undefined ? new Date(lastCalled) : lead.lastCalled);
@@ -593,7 +690,9 @@ export const updateLead = async (req, res) => {
         closedAt,
         country: country ? String(country).trim() : lead.country,
         product: product !== undefined ? (product ? String(product).trim() : null) : lead.product,
-        campus: campus ? String(campus).trim() : lead.campus
+        campus: campus ? String(campus).trim() : lead.campus,
+        referenceName: referenceName !== undefined ? (referenceName ? String(referenceName).trim() : null) : lead.referenceName,
+        referenceNumber: referenceNumber !== undefined ? (referenceNumber ? String(referenceNumber).trim() : null) : lead.referenceNumber
       }, { transaction });
 
       // Log status change activity
@@ -871,7 +970,7 @@ export const redistributeLeads = async (req, res) => {
 // @access  Private/Admin,Accountant
 export const assignLeads = async (req, res) => {
   try {
-    const { leadIds, assignTo, reason } = req.body;
+    const { leadIds, assignTo, reason, forceReassign } = req.body;
 
     if (!assignTo) {
       return res.status(400).json({ success: false, message: 'assignTo (salesperson user id) is required' });
@@ -888,18 +987,38 @@ export const assignLeads = async (req, res) => {
     }
 
     const leads = await Lead.findAll({
-      where: { id: { [Op.in]: ids } }
+      where: { id: { [Op.in]: ids } },
+      include: [{ model: User, as: 'salesperson', attributes: ['id', 'name', 'email'] }]
     });
 
     if (!leads || leads.length === 0) {
       return res.status(404).json({ success: false, message: 'No matching leads found' });
     }
 
+    // Check for conflict if not forceReassign and user is not admin
+    if (!forceReassign && req.user.role !== 'admin') {
+      const conflictingLead = leads.find(l => l.assignedTo && l.assignedTo !== newOwner.id);
+      if (conflictingLead) {
+        return res.status(409).json({
+          success: false,
+          code: 'DUPLICATE_ACTIVE_ASSIGNMENT',
+          message: 'Lead is already actively assigned to another salesperson.',
+          existingLeadId: conflictingLead.id,
+          assignedTo: conflictingLead.salesperson ? {
+            id: conflictingLead.salesperson.id,
+            name: conflictingLead.salesperson.name,
+            email: conflictingLead.salesperson.email
+          } : null
+        });
+      }
+    }
+
     const transaction = await sequelize.transaction();
     try {
+      const now = new Date();
       for (const lead of leads) {
         const oldAssigneeId = lead.assignedTo;
-        await lead.update({ assignedTo: newOwner.id }, { transaction });
+        await lead.update({ assignedTo: newOwner.id, assignedAt: now }, { transaction });
 
         // Record AssignmentHistory
         await AssignmentHistory.create({
@@ -907,8 +1026,8 @@ export const assignLeads = async (req, res) => {
           fromUserId: oldAssigneeId,
           toUserId: newOwner.id,
           assignedBy: req.user.id,
-          assignedAt: new Date(),
-          reason: reason || (oldAssigneeId ? 'Lead reassignment' : 'Initial assignment')
+          assignedAt: now,
+          reason: reason || (oldAssigneeId ? 'Force lead reassignment' : 'Initial assignment')
         }, { transaction });
 
         // Record Activity
@@ -935,6 +1054,67 @@ export const assignLeads = async (req, res) => {
     } catch (assignErr) {
       await transaction.rollback();
       throw assignErr;
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Admin-only force reassign a lead to a new BDE
+// @route   POST /api/leads/:id/force-reassign
+// @access  Private/Admin
+export const forceReassignLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assignTo, reason } = req.body;
+
+    if (!assignTo) {
+      return res.status(400).json({ success: false, message: 'assignTo is required' });
+    }
+
+    const newOwner = await User.findByPk(assignTo);
+    if (!newOwner || newOwner.role !== 'salesperson' || !newOwner.isActive) {
+      return res.status(400).json({ success: false, message: 'assignTo must be an active salesperson' });
+    }
+
+    const lead = await Lead.findByPk(id);
+    if (!lead) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+
+    const oldAssigneeId = lead.assignedTo;
+    const now = new Date();
+
+    const transaction = await sequelize.transaction();
+    try {
+      await lead.update({ assignedTo: newOwner.id, assignedAt: now }, { transaction });
+
+      await AssignmentHistory.create({
+        leadId: lead.id,
+        fromUserId: oldAssigneeId,
+        toUserId: newOwner.id,
+        assignedBy: req.user.id,
+        assignedAt: now,
+        reason: reason || 'Admin explicit force reassignment'
+      }, { transaction });
+
+      await Activity.create({
+        leadId: lead.id,
+        userId: req.user.id,
+        type: 'note',
+        description: `Explicit force reassignment to ${newOwner.name} by Admin`
+      }, { transaction });
+
+      await transaction.commit();
+
+      const updated = await Lead.findByPk(lead.id, {
+        include: [{ model: User, as: 'salesperson', attributes: ['id', 'name', 'email'] }]
+      });
+
+      return res.status(200).json({ success: true, message: 'Lead force-reassigned successfully', data: updated });
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
     }
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -975,7 +1155,7 @@ export const getUnassignedLeads = async (req, res) => {
 export const getLeadQueue = async (req, res) => {
   try {
     const userId = req.user.id;
-    const branch = req.user.branch.toLowerCase();
+    const branch = (req.user.branch || '').toLowerCase();
     const { bucket = 'all' } = req.query;
 
     const now = new Date();
@@ -984,9 +1164,11 @@ export const getLeadQueue = async (req, res) => {
 
     const baseWhere = {
       assignedTo: userId,
-      branch,
       isDuplicate: false
     };
+    if (branch) {
+      baseWhere.branch = branch;
+    }
 
     let leads = [];
 

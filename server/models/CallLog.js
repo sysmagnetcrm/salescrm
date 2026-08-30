@@ -9,11 +9,19 @@ const CallLog = sequelize.define('CallLog', {
   },
   leadId: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true,
     references: {
       model: 'Leads',
       key: 'id'
     }
+  },
+  matchingStatus: {
+    type: DataTypes.ENUM('MATCHED', 'AMBIGUOUS', 'UNMATCHED'),
+    defaultValue: 'MATCHED'
+  },
+  syncStatus: {
+    type: DataTypes.ENUM('synced', 'pending'),
+    defaultValue: 'synced'
   },
   leadOwnerId: {
     type: DataTypes.UUID,
@@ -94,6 +102,38 @@ const CallLog = sequelize.define('CallLog', {
   },
   recordingUrl: {
     type: DataTypes.STRING,
+    allowNull: true
+  },
+  recordingStatus: {
+    type: DataTypes.ENUM('available', 'unavailable', 'processing', 'ambiguous', 'failed', 'sync_pending'),
+    defaultValue: 'processing'
+  },
+  storageLocation: {
+    type: DataTypes.ENUM('local_disk', 'object_storage'),
+    defaultValue: 'local_disk'
+  },
+  fileHash: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  retentionStatus: {
+    type: DataTypes.ENUM('active', 'archived', 'purged'),
+    defaultValue: 'active'
+  },
+  recordingSource: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  recordedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  mimeType: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  sizeBytes: {
+    type: DataTypes.INTEGER,
     allowNull: true
   },
   disposition: {

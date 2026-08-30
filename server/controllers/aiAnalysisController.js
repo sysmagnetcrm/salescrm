@@ -1,5 +1,7 @@
 import { CallLog, CallTranscript, CallAIAnalysis, Lead, User } from '../models/index.js';
 
+const isDevMock = process.env.NODE_ENV !== 'production';
+
 // Helper: Verify authorization to access call log
 const canAccessCallLog = async (callLog, user) => {
   if (user.role === 'admin' || user.role === 'accountant') return true;
@@ -27,13 +29,16 @@ export const triggerAIAnalysis = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden: Access to this call record denied.' });
     }
 
-    const isDevMock = process.env.TELEPHONY_PROVIDER === 'development' || !process.env.TELEPHONY_PROVIDER;
-    const hasAudio = Boolean(callLog.recordingUrl);
+    const hasAudio = Boolean(callLog.recordingUrl) && (callLog.recordingStatus === 'available' || callLog.recordingStatus === undefined);
 
-    if (!isDevMock && !hasAudio) {
+    if (!hasAudio) {
+      const statusReason = callLog.recordingStatus === 'ambiguous'
+        ? 'Multiple recordings found (Ambiguous match).'
+        : 'Real call recording is not accessible for this call.';
+
       return res.status(400).json({
         success: false,
-        message: 'AI Analysis Unavailable: Call recording is not available for this call.'
+        message: `AI Analysis Unavailable: ${statusReason}`
       });
     }
 

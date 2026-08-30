@@ -21,7 +21,7 @@ describe('Android Mobile API & Integration Test Suite', () => {
   let mobileLead;
 
   before(async () => {
-    await sequelize.sync();
+    await sequelize.sync({ force: true });
 
     await new Promise((resolve) => {
       server = app.listen(0, () => {

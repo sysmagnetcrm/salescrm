@@ -15,7 +15,8 @@ import {
   createLead,
   assignLeads,
   getUnassignedLeads,
-  markDuplicate
+  markDuplicate,
+  forceReassignLead
 } from '../controllers/leadController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
@@ -34,6 +35,7 @@ router.get('/stale', authorize('admin', 'accountant'), getStaleLeads);
 router.get('/unassigned', authorize('admin', 'accountant'), getUnassignedLeads);
 router.post('/redistribute', authorize('admin', 'accountant'), redistributeLeads);
 router.post('/assign', authorize('admin', 'accountant'), assignLeads);
+router.post('/:id/force-reassign', authorize('admin'), forceReassignLead);
 router.get('/', authorize('admin', 'accountant'), getAllLeads);
 router.get('/my-leads', authorize('salesperson'), getMyLeads);
 router.get('/queue', authorize('salesperson'), getLeadQueue);

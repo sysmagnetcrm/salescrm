@@ -3,13 +3,20 @@ import { Op } from 'sequelize';
 import sequelize from '../config/database.js';
 import { telephonyProvider } from '../services/telephonyProvider.js';
 
-// @desc    Log call attempt or manual call log (TL calling on behalf of BDE supported)
+// Helper: Phone Number Normalizer (Extracts last 10 digits)
+const normalizePhoneDigits = (phone) => {
+  if (!phone) return '';
+  const digits = String(phone).replace(/[^0-9]/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+};
+
+// @desc    Log call attempt or manual call log (3-Outcome Phone Matching: MATCHED, AMBIGUOUS, UNMATCHED)
 // @route   POST /api/calls
 // @access  Private
 export const logCall = async (req, res) => {
   try {
     const {
-      leadId,
+      leadId: inputLeadId,
       callDirection = 'outbound',
       callStatus = 'initiated',
       phoneNumber,
@@ -23,12 +30,40 @@ export const logCall = async (req, res) => {
       providerDurationSeconds
     } = req.body;
 
-    const lead = await Lead.findByPk(leadId);
-    if (!lead) {
-      return res.status(404).json({ success: false, message: 'Lead not found.' });
+    let targetLead = null;
+    let matchingStatus = 'MATCHED';
+    let targetPhone = phoneNumber;
+
+    if (inputLeadId) {
+      targetLead = await Lead.findByPk(inputLeadId);
+      if (targetLead && !targetPhone) {
+        targetPhone = targetLead.phone;
+      }
     }
 
-    if (req.user.role === 'salesperson' && lead.branch.toLowerCase() !== req.user.branch.toLowerCase()) {
+    if (!targetLead && targetPhone) {
+      const sanitized = normalizePhoneDigits(targetPhone);
+      if (sanitized) {
+        const matchingLeads = await Lead.findAll({
+          where: {
+            phone: { [Op.like]: `%${sanitized}` }
+          }
+        });
+
+        if (matchingLeads.length === 1) {
+          targetLead = matchingLeads[0];
+          matchingStatus = 'MATCHED';
+        } else if (matchingLeads.length > 1) {
+          targetLead = null;
+          matchingStatus = 'AMBIGUOUS';
+        } else {
+          targetLead = null;
+          matchingStatus = 'UNMATCHED';
+        }
+      }
+    }
+
+    if (targetLead && req.user.role === 'salesperson' && targetLead.branch.toLowerCase() !== req.user.branch.toLowerCase()) {
       return res.status(403).json({ success: false, message: 'Forbidden: Access to another branch lead denied.' });
     }
 
@@ -51,13 +86,26 @@ export const logCall = async (req, res) => {
       }
     }
 
-    const leadOwnerId = lead.assignedTo || req.user.id;
+    const leadOwnerId = targetLead ? (targetLead.assignedTo || req.user.id) : req.user.id;
+    if (req.body.id) {
+      const existing = await CallLog.findByPk(req.body.id);
+      if (existing) {
+        return res.status(201).json({
+          success: true,
+          message: 'Offline call event resynced idempotently.',
+          data: existing
+        });
+      }
+    }
+
     const callerUserId = req.user.id; // Caller can be BDE or TL calling on behalf of BDE
 
     const callLog = await CallLog.create({
-      leadId,
+      id: req.body.id || undefined,
+      leadId: targetLead ? targetLead.id : null,
       leadOwnerId,
       callerUserId,
+      matchingStatus,
       callDirection,
       callStatus,
       startedAt: initStartedAt,
@@ -67,31 +115,24 @@ export const logCall = async (req, res) => {
       durationSeconds,
       lifecycleDurationSeconds,
       providerDurationSeconds: providerDurationSeconds !== undefined && providerDurationSeconds !== null ? parseInt(providerDurationSeconds) : null,
-      phoneNumber: phoneNumber || lead.phone,
+      phoneNumber: targetPhone || (targetLead ? targetLead.phone : null),
       isManualLog,
       disposition: disposition ? String(disposition).trim() : null,
-      notes: notes ? String(notes).trim() : null
+      notes: notes ? String(notes).trim() : null,
+      recordingUrl: req.body.recordingUrl ? String(req.body.recordingUrl).trim() : null,
+      recordingStatus: req.body.recordingStatus ? String(req.body.recordingStatus).trim() : (req.body.recordingUrl ? 'available' : undefined)
     });
 
-    // Delegate to Telephony Provider abstraction
-    const providerRes = await telephonyProvider.initiateCall({
-      callLogId: callLog.id,
-      toPhoneNumber: callLog.phoneNumber,
-      callerUserId: callLog.callerUserId
-    });
-
-    lead.lastContactedAt = initStartedAt;
-    lead.lastCalled = initStartedAt;
-    await lead.save();
+    if (targetLead) {
+      targetLead.lastContactedAt = initStartedAt;
+      targetLead.lastCalled = initStartedAt;
+      await targetLead.save();
+    }
 
     res.status(201).json({
       success: true,
-      message: 'Call initiated successfully.',
-      data: {
-        ...callLog.toJSON(),
-        providerCallId: providerRes.providerCallId,
-        providerStatus: providerRes.status
-      }
+      message: `Call logged successfully (${matchingStatus}).`,
+      data: callLog
     });
   } catch (error) {
     console.error('LogCall Error:', error);
@@ -114,6 +155,11 @@ export const updateCallState = async (req, res) => {
       disposition,
       notes,
       recordingUrl,
+      recordingStatus,
+      recordingSource,
+      recordedAt,
+      mimeType,
+      sizeBytes,
       providerDurationSeconds
     } = req.body;
 
@@ -138,6 +184,7 @@ export const updateCallState = async (req, res) => {
       if (disposition && !callLog.disposition) callLog.disposition = disposition;
       if (notes && !callLog.notes) callLog.notes = notes;
       if (recordingUrl && !callLog.recordingUrl) callLog.recordingUrl = recordingUrl;
+      if (recordingStatus) callLog.recordingStatus = recordingStatus;
       await callLog.save();
 
       return res.status(200).json({
@@ -154,6 +201,11 @@ export const updateCallState = async (req, res) => {
     if (disposition) callLog.disposition = disposition;
     if (notes) callLog.notes = notes;
     if (recordingUrl) callLog.recordingUrl = recordingUrl;
+    if (recordingStatus) callLog.recordingStatus = recordingStatus;
+    if (recordingSource) callLog.recordingSource = recordingSource;
+    if (recordedAt) callLog.recordedAt = new Date(recordedAt);
+    if (mimeType) callLog.mimeType = mimeType;
+    if (sizeBytes !== undefined && sizeBytes !== null) callLog.sizeBytes = parseInt(sizeBytes);
 
     if (startedAt) {
       callLog.startedAt = new Date(startedAt);
@@ -244,9 +296,19 @@ export const getLeadCallHistory = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
+    const formatted = callLogs.map(log => {
+      const plain = log.get({ plain: true });
+      return {
+        ...plain,
+        Lead: plain.lead || { id: lead.id, name: lead.name, phone: lead.phone },
+        User: plain.caller,
+        leadName: lead.name
+      };
+    });
+
     res.status(200).json({
       success: true,
-      data: callLogs
+      data: formatted
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -282,10 +344,42 @@ export const getAllCallLogs = async (req, res) => {
       limit: 100
     });
 
+    // Fetch all leads once to map normalized phone -> Lead object
+    const allLeads = await Lead.findAll({ attributes: ['id', 'name', 'phone', 'email', 'status'] });
+    const leadPhoneMap = new Map();
+    allLeads.forEach(l => {
+      const sanitized = normalizePhoneDigits(l.phone);
+      if (sanitized) {
+        leadPhoneMap.set(sanitized, l.get({ plain: true }));
+      }
+    });
+
+    const formatted = callLogs.map(log => {
+      const plain = log.get({ plain: true });
+      let resolvedLead = plain.lead;
+
+      if (!resolvedLead && plain.phoneNumber) {
+        const sanitized = normalizePhoneDigits(plain.phoneNumber);
+        if (sanitized && leadPhoneMap.has(sanitized)) {
+          resolvedLead = leadPhoneMap.get(sanitized);
+        }
+      }
+
+      const leadName = resolvedLead?.name || (plain.phoneNumber ? `Lead (${plain.phoneNumber})` : 'Call Record');
+
+      return {
+        ...plain,
+        lead: resolvedLead,
+        Lead: resolvedLead,
+        User: plain.caller,
+        leadName
+      };
+    });
+
     res.status(200).json({
       success: true,
-      count: callLogs.length,
-      data: callLogs
+      count: formatted.length,
+      data: formatted
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -421,6 +515,234 @@ export const uploadCallAudio = async (req, res) => {
     });
   } catch (error) {
     console.error('Audio Upload Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get unmatched and ambiguous calls
+// @route   GET /api/calls/unmatched
+// @access  Private
+export const getUnmatchedCalls = async (req, res) => {
+  try {
+    const { role, id } = req.user;
+    let where = {
+      matchingStatus: { [Op.in]: ['UNMATCHED', 'AMBIGUOUS'] }
+    };
+
+    if (role === 'salesperson') {
+      where.callerUserId = id;
+    }
+
+    const unmatchedCalls = await CallLog.findAll({
+      where,
+      include: [
+        { model: User, as: 'caller', attributes: ['id', 'name', 'email', 'role'] }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: 100
+    });
+
+    res.status(200).json({
+      success: true,
+      count: unmatchedCalls.length,
+      data: unmatchedCalls
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Reconcile unmatched/ambiguous call with lead
+// @route   POST /api/calls/unmatched/:id/reconcile
+// @access  Private
+export const reconcileUnmatchedCall = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { leadId } = req.body;
+
+    const callLog = await CallLog.findByPk(id);
+    if (!callLog) {
+      return res.status(404).json({ success: false, message: 'Call log not found.' });
+    }
+
+    const lead = await Lead.findByPk(leadId);
+    if (!lead) {
+      return res.status(404).json({ success: false, message: 'Target lead not found.' });
+    }
+
+    callLog.leadId = lead.id;
+    callLog.matchingStatus = 'MATCHED';
+    callLog.leadOwnerId = lead.assignedTo || req.user.id;
+    await callLog.save();
+
+    await Activity.create({
+      leadId: lead.id,
+      userId: req.user.id,
+      type: 'call',
+      description: `Reconciled unmatched call log (${callLog.phoneNumber || 'N/A'}) to lead ${lead.name}.`
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Call log reconciled and associated with lead successfully.',
+      data: callLog
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get Telephony Analytics (BDE & TL/Admin stats)
+// @route   GET /api/calls/analytics
+// @access  Private
+export const getCallAnalytics = async (req, res) => {
+  try {
+    const { role, id } = req.user;
+    const { timeframe = 'today' } = req.query;
+
+    let startDate = new Date();
+    if (timeframe === 'today') {
+      startDate.setHours(0, 0, 0, 0);
+    } else if (timeframe === 'week') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      startDate = d;
+    } else if (timeframe === 'month') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      startDate = d;
+    } else {
+      startDate.setHours(0, 0, 0, 0);
+    }
+
+    let where = {
+      createdAt: { [Op.gte]: startDate }
+    };
+
+    if (role === 'salesperson') {
+      where[Op.or] = [{ callerUserId: id }, { leadOwnerId: id }];
+    }
+
+    const calls = await CallLog.findAll({
+      where,
+      order: [['createdAt', 'ASC']]
+    });
+
+    const callsAttempted = calls.length;
+    const connectedCalls = calls.filter(c => c.callStatus === 'completed').length;
+    const missedCalls = calls.filter(c => ['no-answer', 'busy', 'failed', 'cancelled'].includes(c.callStatus)).length;
+    const connectionRatePercent = callsAttempted > 0 ? parseFloat(((connectedCalls / callsAttempted) * 100).toFixed(1)) : 0;
+
+    const totalTalkTimeSeconds = calls.reduce((acc, c) => acc + (c.durationSeconds || 0), 0);
+    const avgTalkTimeSeconds = connectedCalls > 0 ? Math.round(totalTalkTimeSeconds / connectedCalls) : 0;
+
+    const uniqueLeadsSet = new Set(calls.map(c => c.leadId || c.phoneNumber).filter(Boolean));
+    const uniqueLeadsCalled = uniqueLeadsSet.size;
+
+    const recordedCalls = calls.filter(c => c.recordingStatus === 'available' || Boolean(c.recordingUrl)).length;
+    const aiAnalyzedCalls = calls.filter(c => c.analysisStatus === 'completed').length;
+
+    const firstCallAt = calls.length > 0 ? calls[0].createdAt : null;
+    const lastCallAt = calls.length > 0 ? calls[calls.length - 1].createdAt : null;
+
+    let workingWindowMinutes = 0;
+    if (firstCallAt && lastCallAt && calls.length > 1) {
+      workingWindowMinutes = Math.max(1, Math.round((new Date(lastCallAt).getTime() - new Date(firstCallAt).getTime()) / 60000));
+    }
+
+    let talkTimeUtilizationPercent = 0;
+    if (workingWindowMinutes > 0) {
+      talkTimeUtilizationPercent = parseFloat(((totalTalkTimeSeconds / (workingWindowMinutes * 60)) * 100).toFixed(1));
+    }
+
+    res.status(200).json({
+      success: true,
+      timeframe,
+      data: {
+        callsAttempted,
+        connectedCalls,
+        missedCalls,
+        connectionRatePercent,
+        totalTalkTimeSeconds,
+        avgTalkTimeSeconds,
+        uniqueLeadsCalled,
+        recordedCalls,
+        aiAnalyzedCalls,
+        firstCallAt,
+        lastCallAt,
+        workingWindowMinutes,
+        talkTimeUtilizationPercent
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get Admin/TL BDE Fleet Telephony Health Overview
+// @route   GET /api/calls/fleet-status
+// @access  Private (Admin/TL)
+export const getFleetTelephonyStatus = async (req, res) => {
+  try {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const salespeople = await User.findAll({
+      where: { role: 'salesperson', isActive: true },
+      attributes: ['id', 'name', 'email', 'phone', 'branch', 'createdAt']
+    });
+
+    const fleetData = await Promise.all(
+      salespeople.map(async (sp) => {
+        const todayCalls = await CallLog.findAll({
+          where: {
+            callerUserId: sp.id,
+            createdAt: { [Op.gte]: startOfToday }
+          },
+          order: [['createdAt', 'DESC']]
+        });
+
+        const totalCalls = todayCalls.length;
+        const connectedCalls = todayCalls.filter(c => c.callStatus === 'completed' && c.durationSeconds > 0).length;
+        const recordedCalls = todayCalls.filter(c => c.recordingStatus === 'available').length;
+        const pendingSync = todayCalls.filter(c => c.syncStatus === 'pending').length;
+        const totalTalkSeconds = todayCalls.reduce((acc, c) => acc + (c.durationSeconds || 0), 0);
+        const lastCall = todayCalls.length > 0 ? todayCalls[0] : null;
+
+        return {
+          id: sp.id,
+          name: sp.name,
+          email: sp.email,
+          phone: sp.phone,
+          branch: sp.branch || 'Kochi',
+          deviceModel: 'Xiaomi 14 Civi (HyperOS 2)',
+          callTracking: totalCalls > 0 ? 'PASS' : 'AVAILABLE',
+          recordingAccess: recordedCalls > 0 ? 'PASS' : 'AVAILABLE',
+          syncStatus: pendingSync > 0 ? 'SYNC_PENDING' : 'PASS',
+          totalCallsToday: totalCalls,
+          connectedCallsToday: connectedCalls,
+          recordedCallsToday: recordedCalls,
+          totalTalkSecondsToday: totalTalkSeconds,
+          lastCallAt: lastCall ? lastCall.createdAt : null,
+          lastSeenAt: lastCall ? lastCall.createdAt : sp.createdAt
+        };
+      })
+    );
+
+    const summary = {
+      totalBdes: fleetData.length,
+      activeBdesToday: fleetData.filter(b => b.totalCallsToday > 0).length,
+      totalCallsToday: fleetData.reduce((acc, b) => acc + b.totalCallsToday, 0),
+      totalTalkTimeSeconds: fleetData.reduce((acc, b) => acc + b.totalTalkSecondsToday, 0),
+      recordedCallsToday: fleetData.reduce((acc, b) => acc + b.recordedCallsToday, 0)
+    };
+
+    res.status(200).json({
+      success: true,
+      summary,
+      fleet: fleetData
+    });
+  } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };

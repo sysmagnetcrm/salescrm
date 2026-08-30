@@ -186,7 +186,8 @@ describe('BDE Workspace, Telephony & Call Intelligence Test Suite', () => {
         startedAt: startTime,
         connectedAt: connectTime,
         endedAt: endTime,
-        disposition: 'Interested'
+        disposition: 'Interested',
+        recordingUrl: 'https://storage.test/audio.mp3'
       })
     });
 
@@ -237,10 +238,22 @@ describe('BDE Workspace, Telephony & Call Intelligence Test Suite', () => {
   });
 
   test('Async AI Call Intelligence triggers with HTTP 202 Accepted without blocking API', async () => {
+    // Ensure recordingUrl and recordingStatus are explicitly set for test
+    await CallLog.update(
+      { recordingUrl: 'https://storage.test/audio.mp3', recordingStatus: 'available' },
+      { where: { id: callLog1.id } }
+    );
+
     const aiRes = await fetch(`${baseURL}/api/calls/${callLog1.id}/analyze`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${bdeToken1}` }
     });
+
+    if (aiRes.status !== 202) {
+      const errJson = await aiRes.json();
+      console.error('AI TEST ERROR:', aiRes.status, errJson);
+    }
+
     assert.equal(aiRes.status, 202);
     const json = await aiRes.json();
     assert.equal(json.success, true);

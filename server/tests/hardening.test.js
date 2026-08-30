@@ -333,6 +333,8 @@ describe('RMA CRM Comprehensive Hardening & Regression Test Suite', () => {
 
   // 6. Lead Lifecycle & Status Normalization Tests
   test('Updating status to registered sets closedAt and logs Activity', async () => {
+    await kochiLead.update({ totalClearedPayment: 9000, batchAllocationEligible: true });
+
     const res = await fetch(`${baseURL}/api/leads/${kochiLead.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${salesKochiToken}` },

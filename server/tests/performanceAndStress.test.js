@@ -53,7 +53,7 @@ describe('Academy CRM Performance, Stress, Concurrency & Data Integrity Benchmar
       });
     });
 
-    const jwtSecret = process.env.JWT_SECRET || 'secret';
+    const jwtSecret = process.env.JWT_SECRET || 'fallback_development_jwt_secret_key_12345';
 
     adminUser = await User.create({
       name: 'Stress Admin',

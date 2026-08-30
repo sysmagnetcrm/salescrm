@@ -67,37 +67,18 @@ const authenticateUser = async (req, res, inputIdentifier, inputPassword) => {
   const digitsOnly = rawIdentifier.replace(/[^0-9]/g, '');
   const last10Digits = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
 
-  let user = null;
-
-  // Search by Email if @ present, or Phone if numeric, or fallback OR search
-  if (cleanEmail.includes('@')) {
-    user = await User.findOne({ where: { email: cleanEmail } });
-  } else if (digitsOnly && digitsOnly.length >= 7) {
-    const phoneQueries = [
-      { phone: rawIdentifier },
-      { phone: digitsOnly }
-    ];
-    if (last10Digits && last10Digits !== digitsOnly) {
-      phoneQueries.push({ phone: last10Digits });
-    }
-    user = await User.findOne({
-      where: {
-        [Op.or]: phoneQueries
-      }
-    });
-  }
-
-  // Fallback search across both email and phone
-  if (!user) {
-    user = await User.findOne({
-      where: {
-        [Op.or]: [
-          { email: cleanEmail },
-          { phone: rawIdentifier }
-        ]
-      }
-    });
-  }
+  const user = await User.findOne({
+    where: cleanEmail.includes('@')
+      ? { email: cleanEmail }
+      : {
+          [Op.or]: [
+            { email: cleanEmail },
+            { phone: rawIdentifier },
+            { phone: digitsOnly },
+            ...(last10Digits ? [{ phone: { [Op.like]: `%${last10Digits}` } }] : [])
+          ]
+        }
+  });
 
   // Constant-work execution: perform dummy bcrypt check if user not found to prevent timing enumeration
   if (!user) {

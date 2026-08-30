@@ -124,7 +124,10 @@ export const callAPI = {
   getCallAudio: (id) => api.get(`/calls/${id}/audio`),
   triggerAIAnalysis: (id) => api.post(`/calls/${id}/analyze`),
   getCallTranscript: (id) => api.get(`/calls/${id}/transcript`),
-  getCallAIAnalysis: (id) => api.get(`/calls/${id}/analysis`)
+  getCallAIAnalysis: (id) => api.get(`/calls/${id}/analysis`),
+  getUnmatchedCalls: () => api.get('/calls/unmatched'),
+  reconcileUnmatchedCall: (id, leadId) => api.post(`/calls/unmatched/${id}/reconcile`, { leadId }),
+  getCallAnalytics: (timeframe) => api.get(`/calls/analytics?timeframe=${timeframe || 'today'}`)
 };
 
 // System Version API
@@ -190,6 +193,12 @@ export const startCrmCall = async (lead) => {
 
   if (callId && window.AndroidCRM?.startCallRecording) {
     window.AndroidCRM.startCallRecording(callId);
+  }
+
+  if (window.AndroidCRM?.setServerConfig) {
+    const token = localStorage.getItem('token') || '';
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://salescrm-7z2o.onrender.com/api';
+    window.AndroidCRM.setServerConfig(apiBase, token);
   }
 
   if (window.AndroidCRM?.placeTelecomCall) {

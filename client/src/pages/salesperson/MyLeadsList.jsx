@@ -392,19 +392,7 @@ const MyLeadsList = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            <select
-              className="input-field w-full"
-              value={filters.country}
-              onChange={(e) => setFilters({ ...filters, country: e.target.value })}
-            >
-              <option value="">All Countries</option>
-              {countries.map((country) => (
-                <option key={country} value={country}>
-                  {country}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-2">
             <select
               className="input-field w-full"
               value={filters.product}
@@ -442,9 +430,9 @@ const MyLeadsList = () => {
         </div>
       </div>
 
-      {/* Sticky Horizontal Scrollable Status Filter Bar */}
-      <div className="sticky top-14 z-30 bg-gray-50 pt-2 pb-2 -mx-3 px-3 mb-2 border-b border-gray-200/60 md:static md:bg-transparent md:border-0 md:p-0 md:mx-0 md:mb-4">
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+      {/* Horizontal Scrollable Status Filter Bar */}
+      <div className="sticky top-14 z-20 bg-gray-50 pt-2 pb-2 w-full max-w-full overflow-x-hidden mb-2 border-b border-gray-200/60 md:static md:bg-transparent md:border-0 md:p-0 md:mb-4">
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full py-0.5 no-scrollbar">
           {allTabs.map((tab) => (
             <button
               key={tab.key}
@@ -622,7 +610,7 @@ const MyLeadsList = () => {
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          {lead.product || 'Course'} • {lead.country || 'India'}
+                          {lead.product || 'Course'}
                         </p>
                       </div>
                       {lead.value !== null && lead.value !== undefined && !isNaN(Number(lead.value)) && Number(lead.value) > 0 && (

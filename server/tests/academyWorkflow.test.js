@@ -27,7 +27,7 @@ describe('Academy Sales CRM Workflow Test Suite', () => {
   let testLead;
 
   before(async () => {
-    await sequelize.sync({ force: false });
+    await sequelize.sync({ force: true });
 
     await new Promise((resolve) => {
       server = app.listen(0, () => {
@@ -70,7 +70,7 @@ describe('Academy Sales CRM Workflow Test Suite', () => {
       branch: 'kochi'
     });
 
-    const jwtSecret = process.env.JWT_SECRET || 'secret';
+    const jwtSecret = process.env.JWT_SECRET || 'fallback_development_jwt_secret_key_12345';
     adminToken = jwt.sign({ id: adminUser.id }, jwtSecret, { expiresIn: '1h' });
     bde1Token = jwt.sign({ id: bde1User.id }, jwtSecret, { expiresIn: '1h' });
     tlToken = jwt.sign({ id: tlUser.id }, jwtSecret, { expiresIn: '1h' });
@@ -451,6 +451,294 @@ describe('Academy Sales CRM Workflow Test Suite', () => {
     assert.equal(dupRes.status, 200);
     const dupBody = await dupRes.json();
     assert.equal(dupBody.data.isDuplicate, true);
+  });
+
+  it('ITEM 1: Duplicate phone creation attempt returns 409 Conflict with existing owner details', async () => {
+    const dupPhoneRes = await fetch(`${baseURL}/api/leads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+        'x-client-version': '1.2.0'
+      },
+      body: JSON.stringify({
+        name: 'Duplicate Student',
+        phone: '9876543210',
+        country: 'India',
+        assignedTo: bde1User.id
+      })
+    });
+
+    assert.equal(dupPhoneRes.status, 409);
+    const body = await dupPhoneRes.json();
+    assert.equal(body.success, false);
+    assert.equal(body.code, 'DUPLICATE_ACTIVE_ASSIGNMENT');
+    assert.equal(body.existingLeadId, testLead.id);
+    assert.equal(body.assignedTo.id, bde1User.id);
+  });
+
+  it('ITEM 1: Admin explicit force-reassign transfers ownership and records AssignmentHistory', async () => {
+    const forceRes = await fetch(`${baseURL}/api/leads/${testLead.id}/force-reassign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+        'x-client-version': '1.2.0'
+      },
+      body: JSON.stringify({
+        assignTo: bde1User.id,
+        reason: 'Admin resolved conflict'
+      })
+    });
+
+    assert.equal(forceRes.status, 200);
+    const body = await forceRes.json();
+    assert.equal(body.success, true);
+    assert.equal(body.data.assignedTo, bde1User.id);
+  });
+
+  it('ITEM 2: Status transitions to admission-done, orientation-done, and registered rejected without required payments', async () => {
+    const freshLead = await Lead.create({
+      name: 'Status Test Lead',
+      phone: '9111222333',
+      country: 'India',
+      branch: 'kochi',
+      assignedTo: bde1User.id
+    });
+
+    // 1. Try setting status to admission-done without payment -> expect 400
+    const resAdm = await fetch(`${baseURL}/api/leads/${freshLead.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bde1Token}`, 'x-client-version': '1.2.0' },
+      body: JSON.stringify({ status: 'admission-done' })
+    });
+    assert.equal(resAdm.status, 400);
+    const bodyAdm = await resAdm.json();
+    assert.equal(bodyAdm.success, false);
+    assert.match(bodyAdm.message, /Admission Done/);
+
+    // 2. Try setting status to orientation-done without payment -> expect 400
+    const resOri = await fetch(`${baseURL}/api/leads/${freshLead.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bde1Token}`, 'x-client-version': '1.2.0' },
+      body: JSON.stringify({ status: 'orientation-done' })
+    });
+    assert.equal(resOri.status, 400);
+    const bodyOri = await resOri.json();
+    assert.equal(bodyOri.success, false);
+    assert.match(bodyOri.message, /Orientation Done/);
+
+    // 3. Try setting status to registered without payment -> expect 400
+    const resReg = await fetch(`${baseURL}/api/leads/${freshLead.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bde1Token}`, 'x-client-version': '1.2.0' },
+      body: JSON.stringify({ status: 'registered' })
+    });
+    assert.equal(resReg.status, 400);
+    const bodyReg = await resReg.json();
+    assert.equal(bodyReg.success, false);
+    assert.match(bodyReg.message, /Registered \/ Batch Allocated/);
+
+    // 4. Record ₹1,000 admission payment
+    await fetch(`${baseURL}/api/payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bde1Token}`, 'x-client-version': '1.2.0' },
+      body: JSON.stringify({
+        leadId: freshLead.id,
+        paymentType: 'admission',
+        amount: 1000
+      })
+    });
+
+    // Re-attempt admission-done -> should succeed
+    const passAdm = await fetch(`${baseURL}/api/leads/${freshLead.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bde1Token}`, 'x-client-version': '1.2.0' },
+      body: JSON.stringify({ status: 'admission-done' })
+    });
+    assert.equal(passAdm.status, 200);
+    assert.equal((await passAdm.json()).data.status, 'admission-done');
+
+    // 5. Record ₹8,000 orientation payment (Total cleared: ₹9,000)
+    await fetch(`${baseURL}/api/payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bde1Token}`, 'x-client-version': '1.2.0' },
+      body: JSON.stringify({
+        leadId: freshLead.id,
+        paymentType: 'orientation',
+        amount: 8000
+      })
+    });
+
+    // Re-attempt orientation-done -> should succeed
+    const passOri = await fetch(`${baseURL}/api/leads/${freshLead.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bde1Token}`, 'x-client-version': '1.2.0' },
+      body: JSON.stringify({ status: 'orientation-done' })
+    });
+    assert.equal(passOri.status, 200);
+    assert.equal((await passOri.json()).data.status, 'orientation-done');
+
+    // Re-attempt registered -> should succeed now that total cleared >= 9000 & batchAllocationEligible === true
+    const passReg = await fetch(`${baseURL}/api/leads/${freshLead.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bde1Token}`, 'x-client-version': '1.2.0' },
+      body: JSON.stringify({ status: 'registered' })
+    });
+    assert.equal(passReg.status, 200);
+    assert.equal((await passReg.json()).data.status, 'registered');
+  });
+
+  it('ITEMS 4 & 5: My Leads endpoint returns callCount per lead and supports assignedAt filtering', async () => {
+    try {
+      const res = await fetch(`${baseURL}/api/leads/my-leads`, {
+        headers: {
+          Authorization: `Bearer ${bde1Token}`,
+          'x-client-version': '1.2.0'
+        }
+      });
+
+      if (res.status !== 200) {
+        const errText = await res.text();
+        console.error('FETCH ERROR:', res.status, errText);
+        assert.fail(`GET /api/leads/my-leads returned status ${res.status}: ${errText}`);
+      }
+
+      const body = await res.json();
+      console.log('GET MY LEADS SUCCESS BODY:', JSON.stringify(body));
+      assert.equal(body.success, true);
+      assert.ok(Array.isArray(body.data));
+      assert.ok(body.data.length > 0, 'body.data array should not be empty');
+      assert.equal(typeof body.data[0].callCount, 'number');
+    } catch (err) {
+      console.error('ITEMS 4 & 5 TEST ERROR:', err);
+      throw err;
+    }
+  });
+
+  it('REFERENCE FIELDS: Lead creation with referenceName and referenceNumber persists both fields', async () => {
+    const res = await fetch(`${baseURL}/api/leads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+        'x-client-version': '1.2.0'
+      },
+      body: JSON.stringify({
+        name: 'Referred Student',
+        phone: '9776655443',
+        country: 'India',
+        referenceName: 'John Referee',
+        referenceNumber: 'REF-998877'
+      })
+    });
+
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.equal(body.data.referenceName, 'John Referee');
+    assert.equal(body.data.referenceNumber, 'REF-998877');
+  });
+
+  it('REFERENCE FIELDS: Lead creation without reference fields defaults referenceName and referenceNumber to null (optional)', async () => {
+    const res = await fetch(`${baseURL}/api/leads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+        'x-client-version': '1.2.0'
+      },
+      body: JSON.stringify({
+        name: 'Standard Student',
+        phone: '9776655444',
+        country: 'India'
+      })
+    });
+
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.equal(body.data.referenceName, null);
+    assert.equal(body.data.referenceNumber, null);
+  });
+
+  it('EXPORT / BACKUP / RESTORE: Export report returns XLSX workbook buffer and backup returns JSON bundle', async () => {
+    // 1. Export Report (.xlsx)
+    const reportRes = await fetch(`${baseURL}/api/system/export/report?startDate=2026-01-01&endDate=2026-12-31`, {
+      headers: { Authorization: `Bearer ${adminToken}`, 'x-client-version': '1.2.0' }
+    });
+    assert.equal(reportRes.status, 200);
+    assert.match(reportRes.headers.get('content-type'), /spreadsheetml/);
+
+    // 2. Export Backup (JSON)
+    const backupRes = await fetch(`${baseURL}/api/system/export/backup`, {
+      headers: { Authorization: `Bearer ${adminToken}`, 'x-client-version': '1.2.0' }
+    });
+    assert.equal(backupRes.status, 200);
+    const backupBody = await backupRes.json();
+    assert.equal(backupBody.success, true);
+    assert.ok(backupBody.data.exportedAt);
+    assert.ok(Array.isArray(backupBody.data.leads));
+    assert.ok(Array.isArray(backupBody.data.callLogs));
+    assert.ok(Array.isArray(backupBody.data.payments));
+  });
+
+  it('EXPORT / BACKUP / RESTORE: Restore without confirmFullReplace flag is rejected with 400 Bad Request', async () => {
+    const backupRes = await fetch(`${baseURL}/api/system/export/backup`, {
+      headers: { Authorization: `Bearer ${adminToken}`, 'x-client-version': '1.2.0' }
+    });
+    const backupData = (await backupRes.json()).data;
+
+    const restoreRes = await fetch(`${baseURL}/api/system/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}`, 'x-client-version': '1.2.0' },
+      body: JSON.stringify({ confirmFullReplace: false, backupData })
+    });
+
+    assert.equal(restoreRes.status, 400);
+    const body = await restoreRes.json();
+    assert.equal(body.success, false);
+    assert.match(body.message, /confirmFullReplace: true is required/);
+  });
+
+  it('EXPORT / BACKUP / RESTORE: Full-replace restore replaces database content inside a transaction', async () => {
+    const backupRes = await fetch(`${baseURL}/api/system/export/backup`, {
+      headers: { Authorization: `Bearer ${adminToken}`, 'x-client-version': '1.2.0' }
+    });
+    const backupData = (await backupRes.json()).data;
+
+    const restoreRes = await fetch(`${baseURL}/api/system/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}`, 'x-client-version': '1.2.0' },
+      body: JSON.stringify({ confirmFullReplace: true, backupData })
+    });
+
+    assert.equal(restoreRes.status, 200);
+    const body = await restoreRes.json();
+    assert.equal(body.success, true);
+  });
+
+  it('EXPORT / BACKUP / RESTORE: Simulated failure mid-restore triggers transaction rollback and leaves original data intact', async () => {
+    const preCount = await Lead.count();
+
+    const backupRes = await fetch(`${baseURL}/api/system/export/backup`, {
+      headers: { Authorization: `Bearer ${adminToken}`, 'x-client-version': '1.2.0' }
+    });
+    const backupData = (await backupRes.json()).data;
+
+    const restoreRes = await fetch(`${baseURL}/api/system/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}`, 'x-client-version': '1.2.0' },
+      body: JSON.stringify({ confirmFullReplace: true, backupData, simulateFailure: true })
+    });
+
+    assert.equal(restoreRes.status, 500);
+    const body = await restoreRes.json();
+    assert.equal(body.success, false);
+    assert.match(body.message, /Restore failed and transaction rolled back/);
+
+    const postCount = await Lead.count();
+    assert.equal(postCount, preCount, 'Database lead count should remain unchanged after transaction rollback');
   });
 
   after(async () => {

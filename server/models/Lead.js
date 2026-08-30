@@ -141,6 +141,15 @@ const Lead = sequelize.define('Lead', {
     type: DataTypes.STRING,
     allowNull: false,
     defaultValue: 'kochi'
+  },
+  // Reference Fields
+  referenceName: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  referenceNumber: {
+    type: DataTypes.STRING,
+    allowNull: true
   }
 }, {
   timestamps: true,

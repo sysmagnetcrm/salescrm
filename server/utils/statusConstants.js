@@ -6,6 +6,8 @@ export const LEAD_STATUS = {
   FOLLOW_UP: 'follow-up',
   RNR: 'rnr',
   INTERESTED: 'interested',
+  ADMISSION_DONE: 'admission-done',
+  ORIENTATION_DONE: 'orientation-done',
   REGISTERED: 'registered',
   DEAD: 'dead',
   CANCELLED: 'cancelled',

@@ -90,6 +90,7 @@ const Sidebar = () => {
     { to: '/admin/salespeople', icon: Users, label: 'Manage Team' },
     { to: '/admin/manage-lists', icon: Database, label: 'Manage Lists' },
     { to: '/admin/calls', icon: Phone, label: 'Call Records' },
+    { to: '/admin/telephony-monitor', icon: Activity, label: 'Telephony Fleet' },
     { to: '/admin/reports', icon: FileText, label: 'Reports' },
     { to: '/admin/leaderboard', icon: Trophy, label: 'Leaderboard' },
     { to: '/admin/profile', icon: Settings, label: 'Account Settings' }
@@ -189,6 +190,11 @@ const Sidebar = () => {
                     { to: '/salesperson/dashboard', icon: LayoutDashboard, label: 'My Dashboard' },
                     { to: '/salesperson/leads', icon: ClipboardList, label: 'My Leads', badge: myLeadsCount },
                     { to: '/salesperson/calls', icon: Phone, label: 'Call Records' },
+                    { to: '/salesperson/call-monitor', icon: Zap, label: 'Call Monitor' },
+                    { to: '/salesperson/unmatched-calls', icon: ClipboardList, label: 'Unmatched Calls' },
+                    { to: '/salesperson/call-setup', icon: CheckCircle2, label: 'CRM Call Setup' },
+                    { to: '/salesperson/diagnostics', icon: Settings, label: 'Device Diagnostics' },
+                    { to: '/salesperson/call-analytics', icon: FileText, label: 'Call Analytics' },
                     { to: '/salesperson/leaderboard', icon: Trophy, label: 'Leaderboard' }
                   ].map((link) => {
                     const Icon = link.icon;

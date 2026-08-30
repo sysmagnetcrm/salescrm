@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
 import { LogOut, User, LayoutDashboard, Menu, Settings } from 'lucide-react';
 
+import TelephonyStatusCard from './TelephonyStatusCard';
+
 const Navbar = () => {
   const { user, logout } = useAuth();
   const { appName, location, logoUrl } = useBranding();
@@ -17,8 +19,8 @@ const Navbar = () => {
   const homePath = isAdminLike ? '/admin' : user?.role === 'salesperson' ? '/salesperson' : '/login';
 
   return (
-    <nav className="fixed top-0 left-0 right-0 bg-white shadow-sm border-b z-50">
-      <div className="mx-auto px-3 sm:px-6 lg:px-8 max-w-[430px] md:max-w-7xl">
+    <nav className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm w-full">
+      <div className="w-full max-w-full px-3 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-14">
           <div className="flex items-center space-x-2">
             {/* Mobile hamburger to toggle sidebar */}
@@ -43,6 +45,8 @@ const Navbar = () => {
           </div>
 
           <div className="flex items-center space-x-2">
+            <TelephonyStatusCard />
+
             <div className="flex items-center space-x-1.5 text-gray-700">
               <User className="h-4 w-4 text-gray-500" />
               <span className="font-semibold text-xs md:text-sm max-w-[90px] sm:max-w-none truncate">{user?.name}</span>

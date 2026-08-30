@@ -482,18 +482,6 @@ const AllLeads = () => {
           <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-2">
             <select
               className="input-field"
-              value={filters.country}
-              onChange={(e) => setFilters({ ...filters, country: e.target.value })}
-            >
-              <option value="">All Countries</option>
-              {countries.map((country) => (
-                <option key={country} value={country}>
-                  {country}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input-field"
               value={filters.product || ''}
               onChange={(e) => setFilters({ ...filters, product: e.target.value })}
             >

@@ -88,6 +88,37 @@ const LeadQueueView = () => {
     }
   }, [currentLead]);
 
+  // 1-second active call state polling effect for automatic Telecom disconnect detection
+  useEffect(() => {
+    let pollInterval;
+    if (activeCallId) {
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await callAPI.getAllCallLogs().catch(() => null);
+          const currentLog = res?.data?.data?.find(c => String(c.id) === String(activeCallId));
+          if (currentLog) {
+            const terminalStatuses = ['completed', 'no-answer', 'busy', 'failed', 'cancelled'];
+            if (terminalStatuses.includes(currentLog.callStatus)) {
+              setCallState('idle');
+              setLastCompletedCall({
+                id: currentLog.id,
+                talkTimeSeconds: currentLog.durationSeconds || 0,
+                lifecycleSeconds: currentLog.lifecycleDurationSeconds || 0,
+                endedAt: currentLog.endedAt ? new Date(currentLog.endedAt) : new Date(),
+                phone: currentLog.phoneNumber || calledPhone
+              });
+              setActiveCallId(null);
+              toast.success(`Call ended automatically (${currentLog.durationSeconds || 0}s talk time)`);
+            }
+          }
+        } catch (e) {
+          // Silent polling error handling
+        }
+      }, 1000);
+    }
+    return () => clearInterval(pollInterval);
+  }, [activeCallId, calledPhone]);
+
   // Call timer interval for live connected talk-time
   useEffect(() => {
     let interval;
@@ -124,26 +155,26 @@ const LeadQueueView = () => {
   // Start Call Handler
   const handleStartCall = async (phone) => {
     if (!currentLead || callState !== 'idle') return;
-    setCalledPhone(phone);
+    const sanitized = String(phone).replace(/[^0-9+]/g, '');
+    setCalledPhone(sanitized);
     setCallState('initiating');
 
     try {
-      const callData = await startCrmCall({ ...currentLead, phone });
+      const callData = await startCrmCall({ ...currentLead, phone: sanitized });
       if (callData?.id) {
         setActiveCallId(callData.id);
-        setCallState('ringing');
-
-        setTimeout(async () => {
-          setCallState('connected');
-          await callAPI.updateCallState(callData.id, {
-            callStatus: 'connected',
-            connectedAt: new Date()
-          }).catch(() => {});
-        }, 3000);
+        setCallState('connected');
+        await callAPI.updateCallState(callData.id, {
+          callStatus: 'connected',
+          connectedAt: new Date()
+        }).catch(() => {});
+      } else {
+        window.location.href = `tel:${sanitized}`;
+        setCallState('connected');
       }
     } catch (err) {
-      setCallState('idle');
-      toast.error('Failed to initiate CRM call');
+      window.location.href = `tel:${sanitized}`;
+      setCallState('connected');
     }
   };
 
@@ -450,10 +481,12 @@ const LeadQueueView = () => {
                   <h2 className="text-lg font-bold text-gray-900 leading-tight">{currentLead.name}</h2>
                   <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
                     <span className="font-semibold">{currentLead.product || 'Data Science'}</span>
-                    <span>•</span>
-                    <span>{currentLead.country || 'India'}</span>
-                    <span>•</span>
-                    <span>{currentLead.campus || 'Kochi'}</span>
+                    {currentLead.campus && (
+                      <>
+                        <span>•</span>
+                        <span>{currentLead.campus}</span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div>
