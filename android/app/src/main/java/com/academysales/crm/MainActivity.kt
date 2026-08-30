@@ -186,6 +186,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         @android.webkit.JavascriptInterface
+        fun startCrmCall(phoneNumber: String, leadId: String?, callId: String?) {
+            placeTelecomCall(phoneNumber, leadId, callId)
+        }
+
+        @android.webkit.JavascriptInterface
         fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?) {
             runOnUiThread {
                 try {

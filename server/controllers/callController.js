@@ -217,12 +217,15 @@ export const updateCallState = async (req, res) => {
       callLog.ringingAt = new Date();
     }
 
-    if (connectedAt && !callLog.connectedAt) {
+    // Resolve explicit talk duration from body if passed from native monitor
+    const explicitTalkSecs = durationSeconds !== undefined && durationSeconds !== null
+      ? parseInt(durationSeconds)
+      : (req.body.talkDurationSeconds !== undefined && req.body.talkDurationSeconds !== null ? parseInt(req.body.talkDurationSeconds) : null);
+
+    if (connectedAt) {
       callLog.connectedAt = new Date(connectedAt);
     } else if (callStatus === 'connected' && !callLog.connectedAt) {
       callLog.connectedAt = new Date();
-    } else if (callStatus === 'completed' && !callLog.connectedAt) {
-      callLog.connectedAt = connectedAt ? new Date(connectedAt) : (callLog.startedAt || new Date());
     }
 
     if (terminalStatuses.includes(callStatus)) {
@@ -230,12 +233,26 @@ export const updateCallState = async (req, res) => {
       callLog.endedAt = endTime;
 
       const startTime = callLog.startedAt ? new Date(callLog.startedAt) : endTime;
-      callLog.lifecycleDurationSeconds = Math.max(0, Math.floor((endTime.getTime() - startTime.getTime()) / 1000));
+      
+      if (req.body.lifecycleDurationSeconds !== undefined && req.body.lifecycleDurationSeconds !== null) {
+        callLog.lifecycleDurationSeconds = parseInt(req.body.lifecycleDurationSeconds);
+      } else {
+        callLog.lifecycleDurationSeconds = Math.max(0, Math.floor((endTime.getTime() - startTime.getTime()) / 1000));
+      }
 
-      // Actual talk duration (endedAt - connectedAt for connected calls; 0 for non-connected calls)
-      if (callStatus === 'completed' && callLog.connectedAt) {
-        const connectTime = new Date(callLog.connectedAt);
-        callLog.durationSeconds = Math.max(0, Math.floor((endTime.getTime() - connectTime.getTime()) / 1000));
+      if (callStatus === 'completed') {
+        if (explicitTalkSecs !== null && !isNaN(explicitTalkSecs)) {
+          callLog.durationSeconds = Math.max(0, explicitTalkSecs);
+        } else if (callLog.connectedAt) {
+          const connectTime = new Date(callLog.connectedAt);
+          callLog.durationSeconds = Math.max(0, Math.floor((endTime.getTime() - connectTime.getTime()) / 1000));
+        } else {
+          callLog.durationSeconds = callLog.lifecycleDurationSeconds;
+        }
+
+        if (!callLog.connectedAt && callLog.durationSeconds > 0) {
+          callLog.connectedAt = new Date(endTime.getTime() - (callLog.durationSeconds * 1000));
+        }
       } else {
         callLog.durationSeconds = 0;
       }

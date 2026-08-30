@@ -62,7 +62,7 @@ class CallMonitorService : Service() {
         // Start listening to phone state events inside this Foreground Service context
         NativeCallMonitor.startMonitoring(applicationContext, callId, leadId, phone)
 
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     override fun onDestroy() {
