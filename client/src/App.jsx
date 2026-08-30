@@ -50,6 +50,7 @@ const LocaleRedirect = () => {
 import MobileBottomNav from './components/MobileBottomNav';
 import NetworkBanner from './components/NetworkBanner';
 import ErrorBoundary from './components/ErrorBoundary';
+import ActiveCallController from './components/ActiveCallController';
 
 // Persistent Application Shell — Navbar, Sidebar & Main Content Outlet stay mounted during route transitions
 const AppShell = () => (
@@ -67,6 +68,7 @@ const AppShell = () => (
       </main>
     </div>
     <MobileBottomNav />
+    <ActiveCallController />
   </div>
 );
 

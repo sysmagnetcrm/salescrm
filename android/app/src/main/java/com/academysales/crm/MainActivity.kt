@@ -12,12 +12,15 @@ import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 import androidx.webkit.WebViewAssetLoader
 
+var activeMainActivityInstance: MainActivity? = null
+
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var webView: WebView
+    lateinit var webView: WebView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        activeMainActivityInstance = this
 
         // Secure AssetLoader to load offline Vite dist securely via virtual domain
         val assetLoader = WebViewAssetLoader.Builder()
@@ -332,6 +335,28 @@ class MainActivity : AppCompatActivity() {
         }
 
         @android.webkit.JavascriptInterface
+        fun setMute(muted: Boolean) {
+            com.academysales.crm.telecom.CrmInCallService.setMutedState(muted)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun setSpeaker(speakerOn: Boolean) {
+            com.academysales.crm.telecom.CrmInCallService.setSpeakerState(speakerOn)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun setHold(holdOn: Boolean) {
+            com.academysales.crm.telecom.CrmInCallService.setHoldState(holdOn)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun sendDtmf(digit: String) {
+            if (!digit.isNullOrEmpty()) {
+                com.academysales.crm.telecom.CrmInCallService.playDtmfTone(digit.first())
+            }
+        }
+
+        @android.webkit.JavascriptInterface
         fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?, leadName: String?, authToken: String?) {
             runOnUiThread {
                 try {
@@ -346,7 +371,7 @@ class MainActivity : AppCompatActivity() {
                         com.academysales.crm.telecom.CrmInCallService.userAuthToken = authToken
                     }
 
-                    com.academysales.crm.telecom.CrmInCallService.resetSession(callId, leadId, sanitized, "outbound")
+                    com.academysales.crm.telecom.CrmInCallService.resetSession(callId, leadId, sanitized, leadName, "outbound")
 
                     // Launch Foreground Service to ensure NativeCallMonitor stays alive in background and watches CallLog
                     val monitorIntent = Intent(this@MainActivity, com.academysales.crm.telecom.CallMonitorService::class.java).apply {
@@ -571,5 +596,7 @@ class MainActivity : AppCompatActivity() {
                 "\"offlineQueueLength\":$queueLength" +
                 "}"
         }
+
+        var instance: MainActivity? = null
     }
 }
