@@ -377,15 +377,19 @@ object NativeCallMonitor {
             val endedAtMillis = callDate + (talkDurationSeconds * 1000L)
             val connectedAtMillis = if (talkDurationSeconds > 0 || status == "connected") callDate else null
 
+            val isTerminal = status != "connected" && status != "ringing" && status != "initiated"
             val json = JSONObject().apply {
                 put("callStatus", status)
                 put("startedAt", DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(startTimeMillis)))
                 if (connectedAtMillis != null) {
                     put("connectedAt", DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(connectedAtMillis)))
                 }
-                put("endedAt", DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(endedAtMillis)))
-                put("durationSeconds", talkDurationSeconds)
-                put("lifecycleDurationSeconds", lifecycleSeconds)
+                if (isTerminal) {
+                    val endedAtMillis = callDate + (talkDurationSeconds * 1000L)
+                    put("endedAt", DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(endedAtMillis)))
+                    put("durationSeconds", talkDurationSeconds)
+                    put("lifecycleDurationSeconds", lifecycleSeconds)
+                }
                 put("resolutionReason", reason)
             }
 

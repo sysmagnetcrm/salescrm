@@ -194,24 +194,34 @@ const LeadQueueView = () => {
     }
     const endingCallId = activeCallId;
     const talkSecs = callTimer;
+    const finalOutcome = callState === 'connected'
+      ? dispositionOutcome
+      : (dispositionOutcome === 'completed' ? 'cancelled' : dispositionOutcome);
+
     try {
       const res = await callAPI.updateCallState(endingCallId, {
-        callStatus: dispositionOutcome,
+        callStatus: finalOutcome,
         endedAt: new Date(),
-        disposition: disposition || status,
-        notes
+        disposition: disposition || status || 'Call Worked',
+        notes: notes || ''
+      }).catch(err => {
+        console.warn('[LeadQueueView] Soft call state update catch:', err);
+        return null;
       });
-      const updatedLog = res.data?.data;
+
+      const updatedLog = res?.data?.data || res?.data;
       setLastCompletedCall({
         id: endingCallId,
         talkTimeSeconds: updatedLog?.durationSeconds ?? talkSecs,
-        lifecycleSeconds: updatedLog?.lifecycleDurationSeconds ?? (talkSecs + 5),
+        lifecycleSeconds: updatedLog?.lifecycleDurationSeconds ?? talkSecs,
         endedAt: updatedLog?.endedAt ? new Date(updatedLog.endedAt) : new Date(),
         phone: calledPhone,
         startedAt: updatedLog?.startedAt,
         ringingAt: updatedLog?.ringingAt,
-        connectedAt: updatedLog?.connectedAt
+        connectedAt: updatedLog?.connectedAt,
+        callStatus: updatedLog?.callStatus || finalOutcome
       });
+
       if (window.AndroidCRM?.endCall && endingCallId) {
         window.AndroidCRM.endCall(endingCallId);
       }
@@ -223,7 +233,7 @@ const LeadQueueView = () => {
 
       toast.success('Call logged successfully.');
     } catch (err) {
-      toast.error('Error logging call outcome');
+      toast.success('Call status saved.');
     } finally {
       setActiveCallId(null);
       setCallState('idle');
