@@ -28,7 +28,8 @@ const Lead = sequelize.define('Lead', {
   },
   country: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true,
+    defaultValue: 'India'
   },
   product: {
     type: DataTypes.STRING,

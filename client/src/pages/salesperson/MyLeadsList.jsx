@@ -665,15 +665,15 @@ const MyLeadsList = () => {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
-                if (!createForm.name || !createForm.phone || !createForm.country) {
-                  toast.error('Name, phone and country are required');
+                if (!createForm.name || !createForm.phone) {
+                  toast.error('Name and phone are required');
                   return;
                 }
                 const payload = { ...createForm };
                 await leadAPI.createLead(payload);
                 toast.success('Lead created');
                 setShowCreate(false);
-                setCreateForm({ name: '', phone: '', country: '', email: '', product: '', source: '', notes: '' });
+                setCreateForm({ name: '', phone: '', country: 'India', email: '', product: '', source: '', notes: '' });
                 fetchLeads();
               } catch (err) {
                 toast.error(err.response?.data?.message || 'Failed to create lead');
@@ -686,20 +686,6 @@ const MyLeadsList = () => {
               <div>
                 <label className="label">Phone</label>
                 <input className="input-field" value={createForm.phone} onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} required />
-              </div>
-              <div>
-                <label className="label">Country</label>
-                <select
-                  className="input-field"
-                  value={createForm.country}
-                  onChange={(e) => setCreateForm({ ...createForm, country: e.target.value })}
-                  required
-                >
-                  <option value="">Select Country</option>
-                  {countries.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
               </div>
               <div>
                 <label className="label">Email</label>

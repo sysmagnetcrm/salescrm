@@ -20,6 +20,10 @@ const AllLeads = () => {
   const [assignTo, setAssignTo] = useState('');
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
+  const [showNewProductInput, setShowNewProductInput] = useState(false);
+  const [newProductName, setNewProductName] = useState('');
+  const [addingProduct, setAddingProduct] = useState(false);
+
   const [createForm, setCreateForm] = useState({
     name: '',
     phone: '',
@@ -365,11 +369,28 @@ const AllLeads = () => {
     setLoading(true);
   };
 
+  const handleAddProductInline = async () => {
+    if (!newProductName.trim()) return;
+    setAddingProduct(true);
+    try {
+      await settingsAPI.addProduct({ name: newProductName.trim() });
+      toast.success('Product added successfully');
+      await queryClient.invalidateQueries({ queryKey: ['products'] });
+      setCreateForm(prev => ({ ...prev, product: newProductName.trim() }));
+      setNewProductName('');
+      setShowNewProductInput(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add product');
+    } finally {
+      setAddingProduct(false);
+    }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      if (!createForm.name || !createForm.phone || !createForm.country) {
-        toast.error('Name, phone and country are required');
+      if (!createForm.name || !createForm.phone) {
+        toast.error('Name and phone are required');
         return;
       }
       const payload = { ...createForm, branch };
@@ -377,7 +398,7 @@ const AllLeads = () => {
       await leadAPI.createLead(payload);
       toast.success('Lead created');
       setShowCreate(false);
-      setCreateForm({ name: '', phone: '', country: '', email: '', product: '', source: '', assignedTo: '', notes: '' });
+      setCreateForm({ name: '', phone: '', country: 'India', email: '', product: '', source: '', assignedTo: '', notes: '' });
       fetchLeads();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create lead');
@@ -849,35 +870,50 @@ const AllLeads = () => {
                 <input className="input-field" value={createForm.phone} onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} required />
               </div>
               <div>
-                <label className="label">Country</label>
-                <select
-                  className="input-field"
-                  value={createForm.country}
-                  onChange={(e) => setCreateForm({ ...createForm, country: e.target.value })}
-                  required
-                >
-                  <option value="">Select Country</option>
-                  {countries.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
                 <label className="label">Email</label>
                 <input type="email" className="input-field" value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} />
               </div>
               <div>
-                <label className="label">Product</label>
-                <select
-                  className="input-field"
-                  value={createForm.product}
-                  onChange={(e) => setCreateForm({ ...createForm, product: e.target.value })}
-                >
-                  <option value="">Select Product</option>
-                  {products.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="label mb-0">Product</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewProductInput(!showNewProductInput)}
+                    className="text-xs text-primary-600 hover:text-primary-800 font-semibold"
+                  >
+                    {showNewProductInput ? '✕ Cancel' : '+ Add Product'}
+                  </button>
+                </div>
+                {showNewProductInput ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      className="input-field py-1.5 text-sm"
+                      placeholder="New product name..."
+                      value={newProductName}
+                      onChange={(e) => setNewProductName(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddProductInline}
+                      disabled={addingProduct || !newProductName.trim()}
+                      className="btn-primary text-xs py-1.5 px-3 whitespace-nowrap"
+                    >
+                      {addingProduct ? 'Adding...' : 'Add'}
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    className="input-field"
+                    value={createForm.product}
+                    onChange={(e) => setCreateForm({ ...createForm, product: e.target.value })}
+                  >
+                    <option value="">Select Product</option>
+                    {products.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="label">Assign To</label>

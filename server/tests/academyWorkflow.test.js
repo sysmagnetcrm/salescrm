@@ -662,6 +662,26 @@ describe('Academy Sales CRM Workflow Test Suite', () => {
     assert.equal(body.data.referenceNumber, null);
   });
 
+  it('MANUAL LEAD CREATION: Lead creation succeeds without country and defaults to India', async () => {
+    const res = await fetch(`${baseURL}/api/leads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+        'x-client-version': '1.2.0'
+      },
+      body: JSON.stringify({
+        name: 'No Country Student',
+        phone: '9776655555'
+      })
+    });
+
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.equal(body.data.country, 'India');
+  });
+
   it('EXPORT / BACKUP / RESTORE: Export report returns XLSX workbook buffer and backup returns JSON bundle', async () => {
     // 1. Export Report (.xlsx)
     const reportRes = await fetch(`${baseURL}/api/system/export/report?startDate=2026-01-01&endDate=2026-12-31`, {

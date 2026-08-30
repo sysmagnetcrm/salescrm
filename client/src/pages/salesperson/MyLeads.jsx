@@ -308,15 +308,15 @@ const MyLeads = () => {
             <form onSubmit={async (e)=>{
               e.preventDefault();
               try {
-                if (!createForm.name || !createForm.phone || !createForm.country) {
-                  return alert('Name, phone and country are required');
+                if (!createForm.name || !createForm.phone) {
+                  return alert('Name and phone are required');
                 }
                 const payload = {
                   ...createForm
                 };
                 await leadAPI.createLead(payload);
                 setShowCreate(false);
-                setCreateForm({ name: '', phone: '', country: '', email: '', product: '', source: '', notes: '' });
+                setCreateForm({ name: '', phone: '', country: 'India', email: '', product: '', source: '', notes: '' });
                 fetchLeads();
               } catch (err) {
                 alert(err.response?.data?.message || 'Failed to create lead');
@@ -329,22 +329,6 @@ const MyLeads = () => {
               <div>
                 <label className="label">Phone</label>
                 <input className="input-field" value={createForm.phone} onChange={(e)=>setCreateForm({...createForm,phone:e.target.value})} required />
-              </div>
-              <div>
-                <label className="label">Country</label>
-                <input
-                  className="input-field"
-                  value={createForm.country}
-                  onChange={(e)=>setCreateForm({...createForm,country:e.target.value})}
-                  list="country-list-ml"
-                  placeholder="Start typing..."
-                  required
-                />
-                <datalist id="country-list-ml">
-                  {countries.map((c) => (
-                    <option key={c} value={c} />
-                  ))}
-                </datalist>
               </div>
               <div>
                 <label className="label">Email</label>

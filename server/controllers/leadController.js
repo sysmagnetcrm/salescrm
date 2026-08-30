@@ -62,7 +62,7 @@ export const uploadLeads = async (req, res) => {
       const country = lead.country ? String(lead.country).trim() : '';
       const normPhone = normalizePhone(rawPhone);
 
-      if (!name || !rawPhone || !country) {
+      if (!name || !rawPhone) {
         invalidRows++;
         continue;
       }
@@ -206,8 +206,8 @@ export const createLead = async (req, res) => {
   try {
     const { name, phone, country, email, product, source, value, notes, date, assignedTo, branch, referenceName, referenceNumber } = req.body;
 
-    if (!name || !phone || !country) {
-      return res.status(400).json({ success: false, message: 'Name, phone and country are required' });
+    if (!name || !phone) {
+      return res.status(400).json({ success: false, message: 'Name and phone are required' });
     }
 
     // Financial value validation
@@ -267,7 +267,7 @@ export const createLead = async (req, res) => {
       const created = await Lead.create({
         name: String(name).trim(),
         phone: String(phone).trim(),
-        country: String(country).trim(),
+        country: country ? String(country).trim() : 'India',
         email: email ? normalizeEmail(email) : null,
         product: product ? String(product).trim() : null,
         source: source ? String(source).trim() : null,
