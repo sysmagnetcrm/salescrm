@@ -97,6 +97,9 @@ const LeadQueueView = () => {
           const res = await callAPI.getCallLog(activeCallId).catch(() => null);
           const currentLog = res?.data?.data || res?.data;
           if (currentLog) {
+            if (currentLog.callStatus === 'connected' && callState !== 'connected') {
+              setCallState('connected');
+            }
             const terminalStatuses = ['completed', 'no-answer', 'busy', 'failed', 'cancelled'];
             if (terminalStatuses.includes(currentLog.callStatus)) {
               setCallState('idle');
@@ -105,10 +108,15 @@ const LeadQueueView = () => {
                 talkTimeSeconds: currentLog.durationSeconds || 0,
                 lifecycleSeconds: currentLog.lifecycleDurationSeconds || 0,
                 endedAt: currentLog.endedAt ? new Date(currentLog.endedAt) : new Date(),
-                phone: currentLog.phoneNumber || calledPhone
+                phone: currentLog.phoneNumber || calledPhone,
+                callStatus: currentLog.callStatus
               });
               setActiveCallId(null);
-              toast.success(`Call ended automatically (${currentLog.durationSeconds || 0}s talk time)`);
+              if (currentLog.callStatus === 'completed') {
+                toast.success(`Call completed (${currentLog.durationSeconds || 0}s talk time)`);
+              } else {
+                toast.error(`Call ended: ${currentLog.callStatus.toUpperCase()} (0s talk time)`);
+              }
             }
           }
         } catch (e) {
@@ -117,7 +125,7 @@ const LeadQueueView = () => {
       }, 1000);
     }
     return () => clearInterval(pollInterval);
-  }, [activeCallId, calledPhone]);
+  }, [activeCallId, calledPhone, callState]);
 
   // Call timer interval for live connected talk-time
   useEffect(() => {
@@ -163,18 +171,14 @@ const LeadQueueView = () => {
       const callData = await startCrmCall({ ...currentLead, phone: sanitized });
       if (callData?.id) {
         setActiveCallId(callData.id);
-        setCallState('connected');
-        await callAPI.updateCallState(callData.id, {
-          callStatus: 'connected',
-          connectedAt: new Date()
-        }).catch(() => {});
+        setCallState('ringing');
       } else {
         window.location.href = `tel:${sanitized}`;
-        setCallState('connected');
+        setCallState('ringing');
       }
     } catch (err) {
       window.location.href = `tel:${sanitized}`;
-      setCallState('connected');
+      setCallState('ringing');
     }
   };
 
