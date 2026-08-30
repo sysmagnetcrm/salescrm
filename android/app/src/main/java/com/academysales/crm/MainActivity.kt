@@ -72,6 +72,15 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        // Register 401 auth error listener for offline event queue sync
+        com.academysales.crm.telecom.CallEventQueueManager.onAuthErrorListener = {
+            runOnUiThread {
+                if (::webView.isInitialized) {
+                    webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('crmAuthExpired'));", null)
+                }
+            }
+        }
+
         // Load offline bundled frontend via virtual secure origin
         webView.loadUrl("https://appassets.androidplatform.net/index.html")
     }

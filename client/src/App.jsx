@@ -131,19 +131,23 @@ const router = createBrowserRouter([
   { path: '*', element: <Navigate to="/login" replace /> }
 ]);
 
+import ErrorBoundary from './components/ErrorBoundary';
+
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BranchProvider>
-          <Toaster position="top-right" />
-          <RouterProvider
-            router={router}
-            future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-          />
-        </BranchProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <BranchProvider>
+            <Toaster position="top-right" />
+            <RouterProvider
+              router={router}
+              future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+            />
+          </BranchProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -16,6 +16,8 @@ object CallEventQueueManager {
     private const val PREFS_NAME = "crm_call_event_queue"
     private const val KEY_QUEUE = "pending_call_events"
 
+    var onAuthErrorListener: (() -> Unit)? = null
+
     @Synchronized
     fun enqueueEvent(context: Context, eventJson: JSONObject) {
         try {
@@ -23,7 +25,7 @@ object CallEventQueueManager {
             val existingArrayStr = prefs.getString(KEY_QUEUE, "[]") ?: "[]"
             val array = JSONArray(existingArrayStr)
 
-            // Duplicate prevention check by callLogId or (phoneNumber + endedAt)
+            // Duplicate prevention check by callId
             val newCallId = eventJson.optString("callId", "")
             for (i in 0 until array.length()) {
                 val item = array.getJSONObject(i)
@@ -67,24 +69,33 @@ object CallEventQueueManager {
 
                 Log.d(TAG, "Flushing ${array.length()} pending call events to server...")
                 val remainingArray = JSONArray()
+                var hadAuthError = false
 
                 for (i in 0 until array.length()) {
                     val event = array.getJSONObject(i)
-                    val success = syncSingleEvent(event, serverBaseUrl, authToken)
-                    if (!success) {
+                    val resultCode = syncSingleEventCode(event, serverBaseUrl, authToken)
+                    if (resultCode == 401) {
+                        hadAuthError = true
+                        remainingArray.put(event)
+                    } else if (resultCode !in 200..299) {
                         remainingArray.put(event)
                     }
                 }
 
                 prefs.edit().putString(KEY_QUEUE, remainingArray.toString()).apply()
                 Log.d(TAG, "Flush completed. Remaining queued events: ${remainingArray.length()}")
+
+                if (hadAuthError) {
+                    Log.w(TAG, "HTTP 401 Auth error detected during sync. Event preserved in queue. Triggering re-auth prompt.")
+                    onAuthErrorListener?.invoke()
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error flushing call event queue: ${e.message}", e)
             }
         }
     }
 
-    private fun syncSingleEvent(event: JSONObject, serverBaseUrl: String, authToken: String?): Boolean {
+    private fun syncSingleEventCode(event: JSONObject, serverBaseUrl: String, authToken: String?): Int {
         return try {
             val endpointUrl = if (event.has("callLogId")) {
                 "$serverBaseUrl/api/calls/${event.getString("callLogId")}"
@@ -108,10 +119,10 @@ object CallEventQueueManager {
 
             val code = conn.responseCode
             Log.d(TAG, "Synced call event to $endpointUrl -> HTTP $code")
-            code in 200..299
+            code
         } catch (e: Exception) {
             Log.w(TAG, "Failed to sync event: ${e.message}")
-            false
+            -1
         }
     }
 

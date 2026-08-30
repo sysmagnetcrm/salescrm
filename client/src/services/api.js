@@ -55,10 +55,13 @@ api.interceptors.response.use(
     const url = error.config?.url || '';
     const isAuthEndpoint = /\/auth\/(login|login-phone|register)/.test(url);
     if (status === 401 && !isAuthEndpoint) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('crmAuthExpired'));
+      }
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       if (typeof window !== 'undefined' && window.location?.pathname !== '/login') {
-        window.location.href = '/login';
+        window.location.href = '/login?expired=true';
       }
     }
     return Promise.reject(error);

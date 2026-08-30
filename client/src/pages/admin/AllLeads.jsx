@@ -353,7 +353,13 @@ const AllLeads = () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create lead');
+      if (err.response?.data?.code === 'DUPLICATE_ACTIVE_ASSIGNMENT') {
+        const owner = err.response.data.assignedTo;
+        const ownerText = owner ? `${owner.name} (${owner.email})` : 'another salesperson';
+        toast.error(`Conflict: Lead with phone ${createForm.phone} is already assigned to ${ownerText}.`, { duration: 7000 });
+      } else {
+        toast.error(err.response?.data?.message || 'Failed to create lead');
+      }
     }
   };
 
