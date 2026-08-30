@@ -91,6 +91,27 @@ export const connectDB = async () => {
     } catch (e) {
       // Ignore — column already exists
     }
+    // Safely add newer CallLogs columns that may not exist in older production DB instances
+    const callLogMigrations = [
+      `ALTER TABLE "CallLogs" ADD COLUMN "callerUserId" UUID`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "syncStatus" VARCHAR(255) DEFAULT 'synced'`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "recordingStatus" VARCHAR(255) DEFAULT 'processing'`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "lifecycleDurationSeconds" INTEGER DEFAULT 0`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "providerDurationSeconds" INTEGER`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "disposition" VARCHAR(255)`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "notes" TEXT`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "storageLocation" VARCHAR(255) DEFAULT 'local_disk'`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "fileHash" VARCHAR(255)`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "retentionStatus" VARCHAR(255) DEFAULT 'active'`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "recordingSource" VARCHAR(255)`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "recordedAt" TIMESTAMP WITH TIME ZONE`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "mimeType" VARCHAR(255)`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "sizeBytes" INTEGER`,
+      `ALTER TABLE "CallLogs" ADD COLUMN "matchingStatus" VARCHAR(255) DEFAULT 'MATCHED'`
+    ];
+    for (const sql of callLogMigrations) {
+      try { await sequelize.query(sql); } catch (e) { /* column already exists — ignore */ }
+    }
     try {
       await sequelize.query("UPDATE \"Users\" SET branch = 'kochi' WHERE branch = 'main';");
     } catch (e) {

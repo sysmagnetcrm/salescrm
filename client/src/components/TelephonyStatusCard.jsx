@@ -1,28 +1,46 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PhoneCall, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const TelephonyStatusCard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Only meaningful on the actual Android app — the bridge sets window.AndroidCRM.
+  // In a browser (Vercel, desktop) there is no AndroidCRM, so we default to READY
+  // to avoid showing a spurious "ACTION REQUIRED" pill that navigates admins to a
+  // salesperson-only route and triggers a role-guard redirect to /login.
+  const isAndroidApp = typeof window !== 'undefined' && !!window.AndroidCRM;
+
   const [diag, setDiag] = useState({
-    autoStart: 'ACTION REQUIRED',
+    autoStart: isAndroidApp ? 'ACTION REQUIRED' : 'PASS',
     recordingCapability: 'SUPPORTED',
-    callTracking: 'PASS'
+    callTracking: 'PASS',
+    batteryOptimization: 'PASS'
   });
 
   useEffect(() => {
+    if (!isAndroidApp) return;
     try {
-      if (window.AndroidCRM && typeof window.AndroidCRM.getDeviceDiagnostics === 'function') {
+      if (typeof window.AndroidCRM.getDeviceDiagnostics === 'function') {
         const raw = window.AndroidCRM.getDeviceDiagnostics();
         setDiag(JSON.parse(raw));
       }
     } catch (e) {
       console.error('Error fetching status pill diagnostics:', e);
     }
-  }, []);
+  }, [isAndroidApp]);
 
+  // Admins navigate to admin-scoped route; salespersons to their setup wizard.
+  // This prevents admin role-guard from redirecting to /login.
+  const isAdminRole = user?.role === 'admin' || user?.role === 'accountant';
   const handleClick = () => {
-    navigate('/salesperson/call-setup');
+    if (isAdminRole) {
+      navigate('/admin/telephony-monitor');
+    } else {
+      navigate('/salesperson/call-setup');
+    }
   };
 
   const isAction = diag.autoStart === 'ACTION REQUIRED' || diag.batteryOptimization === 'ACTION REQUIRED';
