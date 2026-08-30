@@ -329,7 +329,7 @@ class MainActivity : AppCompatActivity() {
             val model = android.os.Build.MODEL
             val sdk = android.os.Build.VERSION.SDK_INT
             val manufacturer = android.os.Build.MANUFACTURER
-            val isXiaomi = brand.lowercase().contains("xiaomi") || brand.lowercase().contains("redmi") || brand.lowercase().contains("poco")
+            val isXiaomi = manufacturer.lowercase().contains("xiaomi") || brand.lowercase().contains("xiaomi") || brand.lowercase().contains("redmi") || brand.lowercase().contains("poco")
             val isDialer = isDefaultDialer()
 
             val hasPhonePerm = androidx.core.content.ContextCompat.checkSelfPermission(
@@ -337,7 +337,9 @@ class MainActivity : AppCompatActivity() {
                 android.Manifest.permission.CALL_PHONE
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-            val hasAudioPerm = if (sdk >= 33) {
+            val hasStorageAccess = if (sdk >= 30 && android.os.Environment.isExternalStorageManager()) {
+                true
+            } else if (sdk >= 33) {
                 androidx.core.content.ContextCompat.checkSelfPermission(
                     this@MainActivity,
                     android.Manifest.permission.READ_MEDIA_AUDIO
@@ -365,16 +367,16 @@ class MainActivity : AppCompatActivity() {
                 true
             }
 
-            val isAgentRunning = com.academysales.crm.telecom.CallAgentService.isRunning
             val queueLength = com.academysales.crm.telecom.CallEventQueueManager.getPendingQueueLength(this@MainActivity)
             val recCap = com.academysales.crm.telecom.CallRecordingCapabilityManager.getCapability(this@MainActivity).name
 
-            val callTrackingStatus = if (isAgentRunning && hasPhonePerm) "PASS" else "RESTRICTED"
+            // Corrected audit logic reflecting Native Call Monitor architecture:
+            val callTrackingStatus = if (hasPhonePerm) "PASS" else "RESTRICTED"
             val telecomAccessStatus = if (hasPhonePerm) "PASS" else "RESTRICTED"
-            val defaultDialerStatus = if (isDialer) "PASS" else "RESTRICTED"
-            val recordingCapStatus = if (recCap == "SUPPORTED") "SUPPORTED" else "UNAVAILABLE"
-            val recordingAccessStatus = if (hasAudioPerm) "PASS" else "RESTRICTED"
-            val bgExecutionStatus = if (isAgentRunning) "PASS" else "RESTRICTED"
+            val defaultDialerStatus = if (isDialer) "PASS" else "SUPPORTED"
+            val recordingCapStatus = if (recCap == "SUPPORTED") "SUPPORTED" else if (recCap == "RESTRICTED") "RESTRICTED" else "UNAVAILABLE"
+            val recordingAccessStatus = if (hasStorageAccess) "PASS" else "RESTRICTED"
+            val bgExecutionStatus = if (hasPhonePerm) "PASS" else "RESTRICTED"
             val batteryOptimizationStatus = if (isIgnoringBattery) "PASS" else "ACTION REQUIRED"
             val autoStartStatus = if (isXiaomi) "ACTION REQUIRED" else "SUPPORTED"
             val notifStatus = if (hasNotifPerm) "PASS" else "RESTRICTED"

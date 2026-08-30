@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle2, XCircle, AlertCircle, RefreshCw, Cpu, HardDrive, Smartphone } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, XCircle, AlertCircle, RefreshCw, Cpu, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const DeviceDiagnostics = () => {
@@ -9,9 +9,18 @@ const DeviceDiagnostics = () => {
     sdk: 36,
     manufacturer: 'Xiaomi',
     isXiaomi: true,
-    callTrackingSupported: 'PASS',
-    recordingAvailable: 'PASS',
-    aiAnalysisAvailable: 'PASS'
+    callTracking: 'PASS',
+    telecomAccess: 'PASS',
+    defaultDialer: 'SUPPORTED',
+    recordingCapability: 'SUPPORTED',
+    recordingAccess: 'PASS',
+    backgroundExecution: 'PASS',
+    batteryOptimization: 'PASS',
+    autoStart: 'ACTION REQUIRED',
+    notifications: 'PASS',
+    networkSync: 'PASS',
+    aiAvailability: 'AVAILABLE',
+    offlineQueueLength: 0
   });
 
   const [loading, setLoading] = useState(false);
@@ -79,19 +88,23 @@ const DeviceDiagnostics = () => {
     }
   };
 
+  const isXiaomiDevice = diag.isXiaomi || (diag.manufacturer || '').toLowerCase().includes('xiaomi');
+
   const healthChecks = [
-    { key: 'callTracking', label: '1. Call Tracking', desc: 'Monitors outgoing/incoming SIM calls via Android Telecom Framework and CallAgentService.' },
+    { key: 'callTracking', label: '1. Call Tracking', desc: 'Monitors outgoing/incoming SIM calls via Android Telephony Framework and CallLogSyncService.' },
     { key: 'telecomAccess', label: '2. Telecom Access', desc: 'Android CALL_PHONE & Telecom Manager permissions granted for SIM dialing.' },
-    { key: 'defaultDialer', label: '3. Default Dialer', desc: 'RoleManager.ROLE_DIALER held by app for native InCallService UI control.' },
-    { key: 'recordingCapability', label: '4. Recording Capability', desc: 'Xiaomi / MIUI / HyperOS native dialer two-way call recorder availability.' },
-    { key: 'recordingAccess', label: '5. Recording Access', desc: 'MediaStore & local storage audio file read access (READ_MEDIA_AUDIO).' },
-    { key: 'backgroundExecution', label: '6. Background Execution', desc: 'Persistent CallAgentService foreground tracking active.' },
+    { key: 'defaultDialer', label: '3. Default Dialer', desc: 'Default dialer role optional. Native Call Monitor architecture active.' },
+    { key: 'recordingCapability', label: '4. Recording Capability', desc: 'Native OEM call recorder two-way audio availability.' },
+    { key: 'recordingAccess', label: '5. Recording Access', desc: 'All Files Access (MANAGE_EXTERNAL_STORAGE) & MediaStore audio permissions.' },
+    { key: 'backgroundExecution', label: '6. Background Execution', desc: 'Background call monitoring and automatic call log synchronization service.' },
     { key: 'batteryOptimization', label: '7. Battery Optimization', desc: 'Exemption from Android battery saver background killing (PowerManager).', action: () => window.AndroidCRM?.openBatteryOptimizationSettings() },
-    { key: 'autoStart', label: '8. Auto-Start (Xiaomi)', desc: 'Xiaomi HyperOS Security Auto-start background execution permission.', action: () => window.AndroidCRM?.openAutoStartSettings() },
+    { key: 'autoStart', label: `8. Auto-Start (${isXiaomiDevice ? 'Xiaomi' : 'OEM'})`, desc: `${isXiaomiDevice ? 'Xiaomi HyperOS / MIUI' : 'OEM'} Security Auto-start background execution permission.`, action: () => window.AndroidCRM?.openAutoStartSettings() },
     { key: 'notifications', label: '9. Notifications', desc: 'Foreground service status notification permission (POST_NOTIFICATIONS).' },
     { key: 'networkSync', label: '10. Network Synchronization', desc: 'Offline event queue persistence and background server synchronization state.' },
     { key: 'aiAvailability', label: '11. AI Availability', desc: 'Speech-to-text transcript & AI analysis pipeline. Available strictly when real recording exists.' }
   ];
+
+  const rawDeviceName = `${diag.manufacturer || diag.brand || 'Device'} ${diag.model || ''}`.trim();
 
   return (
     <div className="space-y-6">
@@ -122,8 +135,8 @@ const DeviceDiagnostics = () => {
               <Smartphone className="h-7 w-7" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">{diag.brand || 'Xiaomi'} {diag.model || '24053PY09I'}</h2>
-              <p className="text-xs text-slate-400">Android Release 16 (API Level {diag.sdk || 36}) | Xiaomi HyperOS 2</p>
+              <h2 className="text-lg font-bold text-white">{rawDeviceName}</h2>
+              <p className="text-xs text-slate-400">Android Release 16 (API Level {diag.sdk || 36}) | {diag.manufacturer || 'OEM'} Architecture</p>
             </div>
           </div>
           <span className="px-3 py-1 text-xs font-mono font-bold rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/30">
@@ -137,12 +150,12 @@ const DeviceDiagnostics = () => {
             <span className="font-bold text-slate-200">{diag.manufacturer || 'Xiaomi'}</span>
           </div>
           <div>
-            <span className="text-slate-400 block mb-1">Target SDK</span>
-            <span className="font-bold text-slate-200">API 36 (Android 16)</span>
+            <span className="text-slate-400 block mb-1">Model</span>
+            <span className="font-bold text-slate-200">{diag.model || '24053PY09I'}</span>
           </div>
           <div>
-            <span className="text-slate-400 block mb-1">OEM Architecture</span>
-            <span className="font-bold text-slate-200">HyperOS 2 / MIUI System Dialer</span>
+            <span className="text-slate-400 block mb-1">Target SDK</span>
+            <span className="font-bold text-slate-200">API {diag.sdk || 36}</span>
           </div>
           <div>
             <span className="text-slate-400 block mb-1">Calling Transport</span>
@@ -155,7 +168,7 @@ const DeviceDiagnostics = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden space-y-0">
         <div className="p-4 bg-gray-50 border-b border-gray-200 font-bold text-sm text-gray-800 flex justify-between items-center">
           <span>11-Point Telephony System Health Audit</span>
-          <span className="text-xs text-gray-500 font-normal">Xiaomi 14 Civi HyperOS Audit</span>
+          <span className="text-xs text-gray-500 font-normal">{rawDeviceName} Audit</span>
         </div>
 
         <div className="divide-y divide-gray-100">

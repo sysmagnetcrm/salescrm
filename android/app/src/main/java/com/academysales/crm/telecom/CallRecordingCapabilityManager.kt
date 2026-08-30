@@ -2,6 +2,7 @@ package com.academysales.crm.telecom
 
 import android.content.Context
 import android.os.Build
+import android.os.Environment
 
 object CallRecordingCapabilityManager {
 
@@ -18,9 +19,11 @@ object CallRecordingCapabilityManager {
         val model = Build.MODEL.lowercase()
         val isXiaomiOem = manufacturer.contains("xiaomi") || brand.contains("xiaomi") || brand.contains("redmi") || brand.contains("poco") || model.contains("mi ")
 
-        // Check if MediaStore audio permissions or OEM recording directories are accessible
-        val hasStoragePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_MEDIA_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        // Check if MediaStore audio permissions, MANAGE_EXTERNAL_STORAGE, or OEM recording directories are accessible
+        val hasStoragePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager() ||
+            (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+             androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_MEDIA_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED)
         } else {
             androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
         }
@@ -37,7 +40,7 @@ object CallRecordingCapabilityManager {
         val capability = getCapability(context)
         val manufacturer = Build.MANUFACTURER
         return when (capability) {
-            RecordingCapability.SUPPORTED -> "Two-way OEM cellular call recording supported & accessible via MediaStore ($manufacturer)."
+            RecordingCapability.SUPPORTED -> "Two-way OEM cellular call recording supported & accessible via MediaStore / Storage ($manufacturer)."
             RecordingCapability.UNSUPPORTED -> "Call recording unsupported on generic device without native OEM recorder."
             RecordingCapability.RESTRICTED -> "Storage/Media permission required to access native OEM call recordings."
             RecordingCapability.UNKNOWN -> "Device recording capability unknown."

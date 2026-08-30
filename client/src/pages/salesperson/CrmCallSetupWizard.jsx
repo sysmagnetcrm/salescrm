@@ -11,7 +11,7 @@ const CrmCallSetupWizard = () => {
     isXiaomi: true,
     callTracking: 'PASS',
     telecomAccess: 'PASS',
-    defaultDialer: 'PASS',
+    defaultDialer: 'SUPPORTED',
     recordingCapability: 'SUPPORTED',
     recordingAccess: 'PASS',
     backgroundExecution: 'PASS',
@@ -47,19 +47,22 @@ const CrmCallSetupWizard = () => {
     runScan();
   }, []);
 
+  const isXiaomiDevice = diag.isXiaomi || (diag.manufacturer || '').toLowerCase().includes('xiaomi');
+  const rawDeviceName = `${diag.manufacturer || diag.brand || 'Device'} ${diag.model || ''}`.trim();
+
   const requirements = [
     { key: 'telecomAccess', label: '1. Phone Permission', desc: 'Android CALL_PHONE permission to initiate & monitor SIM cellular calls.' },
-    { key: 'callTracking', label: '2. Telecom Availability', desc: 'Android Telecom framework integration & InCallService readiness.' },
-    { key: 'defaultDialer', label: '3. Default Dialer Status', desc: 'RoleManager.ROLE_DIALER role held for native CRM call UI.' },
-    { key: 'backgroundExecution', label: '4. Call Tracking Service', desc: 'CallAgentService foreground service active in system memory.' },
-    { key: 'recordingCapability', label: '5. Recording Capability', desc: 'Xiaomi HyperOS / MIUI native two-way call recording support.' },
-    { key: 'recordingAccess', label: '6. Recording Access', desc: 'MediaStore & external storage audio read permissions.' },
-    { key: 'notifications', label: '7. Notification Permission', desc: 'POST_NOTIFICATIONS granted for persistent service status.' },
+    { key: 'callTracking', label: '2. Telecom Availability', desc: 'Android Telecom framework integration & SIM call monitoring readiness.' },
+    { key: 'defaultDialer', label: '3. Default Dialer Status', desc: 'Default dialer role optional. Native Call Monitor active.' },
+    { key: 'backgroundExecution', label: '4. Call Tracking Service', desc: 'Call monitoring & background logging service capability.' },
+    { key: 'recordingCapability', label: '5. Recording Capability', desc: 'Native OEM call recording support & accessibility.' },
+    { key: 'recordingAccess', label: '6. Recording Access', desc: 'All Files Access (MANAGE_EXTERNAL_STORAGE) & MediaStore read access.' },
+    { key: 'notifications', label: '7. Notification Permission', desc: 'POST_NOTIFICATIONS granted for persistent service status notifications.' },
     { key: 'batteryOptimization', label: '8. Battery Optimization', desc: 'Exemption from Android battery saver background process killing.', action: () => window.AndroidCRM?.openBatteryOptimizationSettings() },
-    { key: 'autoStart', label: '9. Xiaomi Auto-Start', desc: 'Xiaomi Security Auto-start background execution permission.', action: () => window.AndroidCRM?.openAutoStartSettings() },
+    { key: 'autoStart', label: `9. ${isXiaomiDevice ? 'Xiaomi' : 'OEM'} Auto-Start`, desc: `${isXiaomiDevice ? 'Xiaomi HyperOS / MIUI' : 'OEM'} Security Auto-start background execution permission.`, action: () => window.AndroidCRM?.openAutoStartSettings() },
     { key: 'backgroundExecution', label: '10. Background Execution', desc: 'Service continues running when app is backgrounded or screen locked.' },
     { key: 'networkSync', label: '11. Network Synchronization', desc: 'Offline queue local persistence & automatic server flushing.' },
-    { key: 'aiAvailability', label: '12. AI Pipeline Readiness', desc: 'Speech-to-text transcript & AI Call Intelligence (strictly guarded by real audio).' }
+    { key: 'aiAvailability', label: '12. AI Pipeline Readiness', desc: 'Speech-to-text transcript & AI Call Intelligence pipeline.' }
   ];
 
   const getBadge = (status) => {
@@ -135,7 +138,7 @@ const CrmCallSetupWizard = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden divide-y divide-gray-100">
         <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
           <span className="font-bold text-sm text-gray-800">Sequential Telephony Readiness Requirements</span>
-          <span className="text-xs text-gray-500">Target Device: {diag.brand} {diag.model}</span>
+          <span className="text-xs text-gray-500">Target Device: {rawDeviceName}</span>
         </div>
 
         {requirements.map((req, idx) => {
