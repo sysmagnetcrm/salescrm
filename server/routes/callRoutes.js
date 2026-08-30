@@ -1,7 +1,7 @@
 import express from 'express';
 import { protect } from '../middleware/auth.js';
 import { uploadCallAudioFile } from '../middleware/audioUpload.js';
-import { logCall, updateCallState, getLeadCallHistory, getAllCallLogs, getCallAudio, handleProviderWebhook, uploadCallAudio, getUnmatchedCalls, reconcileUnmatchedCall, getCallAnalytics, getFleetTelephonyStatus } from '../controllers/callController.js';
+import { logCall, updateCallState, getCallLogById, getLeadCallHistory, getAllCallLogs, getCallAudio, handleProviderWebhook, uploadCallAudio, getUnmatchedCalls, reconcileUnmatchedCall, getCallAnalytics, getFleetTelephonyStatus } from '../controllers/callController.js';
 import { triggerAIAnalysis, getCallTranscript, getCallAIAnalysis } from '../controllers/aiAnalysisController.js';
 
 const router = express.Router();
@@ -20,7 +20,9 @@ router.route('/')
   .get(getAllCallLogs)
   .post(logCall);
 
-router.put('/:id', updateCallState);
+router.route('/:id')
+  .get(getCallLogById)
+  .put(updateCallState);
 router.post('/:id/upload-audio', uploadCallAudioFile.single('audio'), uploadCallAudio);
 router.get('/lead/:leadId', getLeadCallHistory);
 router.get('/:id/audio', getCallAudio);

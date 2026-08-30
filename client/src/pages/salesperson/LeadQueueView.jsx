@@ -94,8 +94,8 @@ const LeadQueueView = () => {
     if (activeCallId) {
       pollInterval = setInterval(async () => {
         try {
-          const res = await callAPI.getAllCallLogs().catch(() => null);
-          const currentLog = res?.data?.data?.find(c => String(c.id) === String(activeCallId));
+          const res = await callAPI.getCallLog(activeCallId).catch(() => null);
+          const currentLog = res?.data?.data || res?.data;
           if (currentLog) {
             const terminalStatuses = ['completed', 'no-answer', 'busy', 'failed', 'cancelled'];
             if (terminalStatuses.includes(currentLog.callStatus)) {

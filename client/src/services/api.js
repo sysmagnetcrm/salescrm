@@ -124,6 +124,7 @@ export const callAPI = {
   updateCallState: (id, data) => api.put(`/calls/${id}`, data),
   getLeadCallHistory: (leadId) => api.get(`/calls/lead/${leadId}`),
   getAllCallLogs: () => api.get('/calls'),
+  getCallLog: (id) => api.get(`/calls/${id}`),
   getCallAudio: (id) => api.get(`/calls/${id}/audio`),
   triggerAIAnalysis: (id) => api.post(`/calls/${id}/analyze`),
   getCallTranscript: (id) => api.get(`/calls/${id}/transcript`),

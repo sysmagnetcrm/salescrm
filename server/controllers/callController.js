@@ -288,6 +288,29 @@ export const updateCallState = async (req, res) => {
   }
 };
 
+// @desc    Get single call log by ID
+// @route   GET /api/calls/:id
+// @access  Private
+export const getCallLogById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const callLog = await CallLog.findByPk(id, {
+      include: [
+        { model: User, as: 'caller', attributes: ['id', 'name', 'email'] },
+        { model: Lead, as: 'lead', attributes: ['id', 'name', 'phone'] }
+      ]
+    });
+
+    if (!callLog) {
+      return res.status(404).json({ success: false, message: 'Call log not found.' });
+    }
+
+    res.status(200).json({ success: true, data: callLog });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Get call history for a lead
 // @route   GET /api/calls/lead/:leadId
 // @access  Private
