@@ -35,14 +35,21 @@ object OemRecordingResolver {
         val matchedPhoneNumber: String?
     )
 
-    // Primary OEM storage paths on Xiaomi / MIUI / HyperOS and standard Android
+    // Comprehensive OEM storage paths across Xiaomi HyperOS/MIUI, Samsung, OnePlus, Oppo, Vivo, RealMe
     private val OEM_RECORDING_PATHS = arrayOf(
         "/storage/emulated/0/MIUI/sound_recorder/call_rec/",
         "/sdcard/MIUI/sound_recorder/call_rec/",
+        "/storage/emulated/0/Recordings/Call/",
         "/storage/emulated/0/Recordings/CallRec/",
         "/storage/emulated/0/Music/sound_recorder/call_rec/",
         "/storage/emulated/0/CallRecordings/",
-        "/storage/emulated/0/Recorder/call_rec/"
+        "/storage/emulated/0/Recorder/call_rec/",
+        "/storage/emulated/0/Recordings/",
+        "/storage/emulated/0/Sounds/",
+        "/storage/emulated/0/Call/",
+        "/storage/emulated/0/VoiceRecorder/",
+        "/storage/emulated/0/recorder/",
+        "/storage/emulated/0/Android/data/com.google.android.dialer/files/call_recordings/"
     )
 
     fun resolveAndUploadRecording(
@@ -59,22 +66,18 @@ object OemRecordingResolver {
             try {
                 Log.d(TAG, "Starting OEM Recording Reconciliation for callLogId=$callLogId, targetPhone=$targetPhoneNumber, talkDuration=${talkDurationSeconds}s")
 
-                // Wait 2.5 seconds to allow OEM system dialer to finalize and flush audio file
-                Thread.sleep(2500)
+                // Wait 2.0 seconds to allow OEM system dialer to flush audio file
+                Thread.sleep(2000)
 
                 val candidates = findCandidateRecordings(context, targetPhoneNumber, endedAtMillis, talkDurationSeconds)
 
-                val strongCandidates = candidates.filter { it.confidenceScore >= 75 }
+                val strongCandidates = candidates.filter { it.confidenceScore >= 45 }
 
                 when {
-                    strongCandidates.size == 1 -> {
-                        val winner = strongCandidates.first()
-                        Log.d(TAG, "✅ Exactly one strong match found: ${winner.fileName} (Score: ${winner.confidenceScore}%)")
+                    strongCandidates.isNotEmpty() -> {
+                        val winner = strongCandidates.maxByOrNull { it.confidenceScore }!!
+                        Log.d(TAG, "✅ Recording match found: ${winner.fileName} (Score: ${winner.confidenceScore}%, path=${winner.fileOrUri})")
                         uploadRecordingFile(context, winner, callLogId, serverUploadUrl, authToken)
-                    }
-                    strongCandidates.size > 1 -> {
-                        Log.w(TAG, "⚠️ Multiple recordings found with score >= 75%. Ambiguous recording state!")
-                        notifyServerStatus(callLogId, ReconciliationStatus.AMBIGUOUS, serverUploadUrl, authToken, "Multiple recordings found")
                     }
                     else -> {
                         Log.w(TAG, "❌ No OEM call recording matched candidate criteria for callLogId=$callLogId")
@@ -157,15 +160,14 @@ object OemRecordingResolver {
             Log.e(TAG, "Error querying MediaStore for recordings: ${e.message}")
         }
 
-        // 2. Direct File Inspection for Xiaomi / MIUI / HyperOS storage directories
+        // 2. Direct File Inspection for OEM storage directories
         for (dirPath in OEM_RECORDING_PATHS) {
             try {
                 val dir = File(dirPath)
                 if (dir.exists() && dir.isDirectory) {
                     val files = dir.listFiles()
                     files?.forEach { file ->
-                        if (file.isFile && (file.extension == "mp3" || file.extension == "m4a" || file.extension == "amr" || file.extension == "wav" || file.extension == "aac")) {
-                            // Check if already in candidates
+                        if (file.isFile && (file.extension == "mp3" || file.extension == "m4a" || file.extension == "amr" || file.extension == "wav" || file.extension == "aac" || file.extension == "3gp")) {
                             if (candidates.none { it.fileOrUri == file.absolutePath }) {
                                 val fileTimeMillis = file.lastModified()
                                 val durSec = getFileAudioDurationSeconds(file.absolutePath)
@@ -202,67 +204,40 @@ object OemRecordingResolver {
         candidateDurSec: Long,
         targetTalkDurSec: Long
     ): Int {
-        // 1. Primary Signal: Filename Pattern Parsing <Name>(<Phone>)_<YYYYMMDDHHMMSS>.mp3
-        try {
-            val pattern = java.util.regex.Pattern.compile(".*\\(([+\\d\\s-]+)\\)_(\\d{14})\\..*")
-            val matcher = pattern.matcher(fileName)
-            if (matcher.find()) {
-                val rawPhoneInName = matcher.group(1) ?: ""
-                val rawTimestampStr = matcher.group(2) ?: ""
-
-                val normPhoneInName = sanitizePhoneNumber(rawPhoneInName)
-                val targetPhoneNorm = sanitizePhoneNumber(normalizedTargetPhone)
-
-                val phoneMatches = normPhoneInName.isNotEmpty() && targetPhoneNorm.isNotEmpty() &&
-                        (normPhoneInName.endsWith(targetPhoneNorm) || targetPhoneNorm.endsWith(normPhoneInName) ||
-                                (targetPhoneNorm.length >= 7 && normPhoneInName.contains(targetPhoneNorm.takeLast(7))))
-
-                if (phoneMatches && rawTimestampStr.length == 14) {
-                    val sdf = java.text.SimpleDateFormat("yyyyMMddHHmmss", java.util.Locale.US)
-                    val parsedDate = sdf.parse(rawTimestampStr)
-                    if (parsedDate != null) {
-                        val fnTimeMillis = parsedDate.time
-                        val diffMillis = Math.abs(fnTimeMillis - endedAtMillis)
-                        if (diffMillis <= 60000) { // +/- 60 seconds
-                            Log.d(TAG, "🔥 STRONG FILENAME MATCH FOUND! fileName=$fileName, normPhone=$normPhoneInName, timeDiff=${diffMillis / 1000}s")
-                            return 100 // Strong match score 100
-                        }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Filename regex parse fallback for $fileName: ${e.message}")
-        }
-
-        // 2. Fallback Heuristic Point-Scoring System
         var score = 0
-
-        // Phone Number matching (40 points max)
         val extractedDigits = sanitizePhoneNumber(fileName)
-        if (normalizedTargetPhone.length >= 7 && extractedDigits.contains(normalizedTargetPhone.takeLast(7))) {
-            score += 40
-        } else if (normalizedTargetPhone.length >= 10 && extractedDigits.contains(normalizedTargetPhone.takeLast(10))) {
-            score += 40
+        val targetPhoneNorm = sanitizePhoneNumber(normalizedTargetPhone)
+
+        // 1. Phone Number Matching (Up to 50 points)
+        if (targetPhoneNorm.length >= 7) {
+            val last7 = targetPhoneNorm.takeLast(7)
+            if (extractedDigits.contains(last7) || fileName.contains(last7)) {
+                score += 50
+            }
+        } else if (targetPhoneNorm.isNotEmpty() && (extractedDigits.contains(targetPhoneNorm) || fileName.contains(targetPhoneNorm))) {
+            score += 50
         }
 
-        // Call End Timestamp window matching (35 points max)
+        // 2. Creation Time Proximity Matching (Up to 35 points)
         val timeDiffMillis = Math.abs(fileTimeMillis - endedAtMillis)
-        if (timeDiffMillis <= 15000) {
+        if (timeDiffMillis <= 30000) { // Within 30 seconds
             score += 35
-        } else if (timeDiffMillis <= 35000) {
-            score += 20
+        } else if (timeDiffMillis <= 120000) { // Within 2 minutes
+            score += 25
+        } else if (timeDiffMillis <= 300000) { // Within 5 minutes
+            score += 15
         }
 
-        // Audio Duration matching (25 points max)
+        // 3. Audio Duration Matching (Up to 15 points)
         if (targetTalkDurSec > 0 && candidateDurSec > 0) {
             val durDiff = Math.abs(candidateDurSec - targetTalkDurSec)
             if (durDiff <= 5) {
-                score += 25
-            } else if (durDiff <= 12) {
                 score += 15
+            } else if (durDiff <= 15) {
+                score += 10
             }
-        } else if (targetTalkDurSec == 0L && candidateDurSec <= 5) {
-            score += 25
+        } else {
+            score += 10
         }
 
         return score
@@ -300,7 +275,10 @@ object OemRecordingResolver {
             }
 
             val boundary = "----CrmRecordingBoundary${System.currentTimeMillis()}"
-            val url = URL(uploadUrl.replace("/upload-audio", "").let { "$it/upload-audio" })
+            val targetEndpoint = if (uploadUrl.contains("/upload-audio")) uploadUrl else "$uploadUrl/upload-audio"
+            Log.d(TAG, "Uploading audio file ${candidate.fileName} (${file.length()} bytes) to: $targetEndpoint")
+
+            val url = URL(targetEndpoint)
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.doOutput = true
@@ -334,7 +312,12 @@ object OemRecordingResolver {
             writer.close()
 
             val responseCode = conn.responseCode
-            Log.d(TAG, "Audio recording upload response code: $responseCode")
+            Log.d(TAG, "Audio recording upload response code for callLogId=$callLogId: $responseCode")
+            if (responseCode in 200..299) {
+                notifyServerStatus(callLogId, ReconciliationStatus.AVAILABLE, uploadUrl, authToken, "Uploaded successfully (${candidate.fileName})")
+            } else {
+                notifyServerStatus(callLogId, ReconciliationStatus.UNAVAILABLE, uploadUrl, authToken, "Upload HTTP $responseCode")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to upload recording file: ${e.message}", e)
         }

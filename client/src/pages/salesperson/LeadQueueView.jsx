@@ -247,6 +247,8 @@ const LeadQueueView = () => {
       const res = await callAPI.updateCallState(endingCallId, {
         callStatus: finalOutcome,
         endedAt: new Date(),
+        durationSeconds: talkSecs,
+        connectedAt: talkSecs > 0 ? new Date(Date.now() - talkSecs * 1000) : null,
         disposition: disposition || status || 'Call Worked',
         notes: notes || ''
       }).catch(err => {
