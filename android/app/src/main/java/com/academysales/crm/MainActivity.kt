@@ -363,10 +363,33 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     if (hasCallPhone && hasReadCallLog) {
-                        val intent = Intent(Intent.ACTION_CALL, uri).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        var callPlacedViaTelecom = false
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                            try {
+                                val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+                                if (telecomManager != null) {
+                                    val extras = Bundle()
+                                    val accounts = telecomManager.callCapablePhoneAccounts
+                                    val defaultAccount = telecomManager.getDefaultOutgoingPhoneAccount("tel")
+                                        ?: accounts?.firstOrNull()
+                                    if (defaultAccount != null) {
+                                        extras.putParcelable(android.telecom.TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, defaultAccount)
+                                    }
+                                    telecomManager.placeCall(uri, extras)
+                                    callPlacedViaTelecom = true
+                                    Log.d("MainActivity", "Successfully placed call via TelecomManager.placeCall directly!")
+                                }
+                            } catch (e: Exception) {
+                                Log.w("MainActivity", "TelecomManager.placeCall failed: ${e.message}. Falling back to Intent.ACTION_CALL")
+                            }
                         }
-                        startActivity(intent)
+
+                        if (!callPlacedViaTelecom) {
+                            val intent = Intent(Intent.ACTION_CALL, uri).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            startActivity(intent)
+                        }
                     } else {
                         androidx.core.app.ActivityCompat.requestPermissions(
                             this@MainActivity,
