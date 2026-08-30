@@ -220,19 +220,33 @@ class MainActivity : AppCompatActivity() {
         }
 
         @android.webkit.JavascriptInterface
+        fun isDefaultDialerHeld(): Boolean {
+            return try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    val roleManager = getSystemService(Context.ROLE_SERVICE) as? android.app.role.RoleManager
+                    roleManager?.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER) == true
+                } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+                    telecomManager?.defaultDialerPackage == packageName
+                } else {
+                    false
+                }
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        @android.webkit.JavascriptInterface
         fun requestDefaultDialer() {
             runOnUiThread {
                 try {
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                         val roleManager = getSystemService(Context.ROLE_SERVICE) as? android.app.role.RoleManager
                         if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_DIALER)) {
-                            if (!roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER)) {
-                                val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_DIALER)
-                                startActivity(intent)
-                            }
+                            val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_DIALER)
+                            startActivity(intent)
                         }
                     } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                        val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
                         val intent = Intent(android.telecom.TelecomManager.ACTION_CHANGE_DEFAULT_DIALER).apply {
                             putExtra(android.telecom.TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
                         }
@@ -363,32 +377,34 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     if (hasCallPhone && hasReadCallLog) {
-                        var callPlacedViaTelecom = false
                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                            try {
-                                val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
-                                if (telecomManager != null) {
-                                    val extras = Bundle()
-                                    val accounts = telecomManager.callCapablePhoneAccounts
-                                    val defaultAccount = telecomManager.getDefaultOutgoingPhoneAccount("tel")
-                                        ?: accounts?.firstOrNull()
-                                    if (defaultAccount != null) {
-                                        extras.putParcelable(android.telecom.TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, defaultAccount)
-                                    }
-                                    telecomManager.placeCall(uri, extras)
-                                    callPlacedViaTelecom = true
-                                    Log.d("MainActivity", "Successfully placed call via TelecomManager.placeCall directly!")
+                            val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+                            if (telecomManager != null) {
+                                val isHeld = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                    val roleManager = getSystemService(Context.ROLE_SERVICE) as? android.app.role.RoleManager
+                                    roleManager?.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER) == true
+                                } else {
+                                    telecomManager.defaultDialerPackage == packageName
                                 }
-                            } catch (e: Exception) {
-                                Log.w("MainActivity", "TelecomManager.placeCall failed: ${e.message}. Falling back to Intent.ACTION_CALL")
-                            }
-                        }
 
-                        if (!callPlacedViaTelecom) {
-                            val intent = Intent(Intent.ACTION_CALL, uri).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                if (!isHeld) {
+                                    Log.e("MainActivity", "ROLE_DIALER is NOT held by $packageName. Refusing to place call via fallback.")
+                                    requestDefaultDialer()
+                                    return@runOnUiThread
+                                }
+
+                                val extras = Bundle()
+                                val accounts = telecomManager.callCapablePhoneAccounts
+                                val defaultAccount = telecomManager.getDefaultOutgoingPhoneAccount("tel")
+                                    ?: accounts?.firstOrNull()
+                                if (defaultAccount != null) {
+                                    extras.putParcelable(android.telecom.TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, defaultAccount)
+                                }
+                                telecomManager.placeCall(uri, extras)
+                                Log.d("MainActivity", "Successfully placed call via TelecomManager.placeCall directly!")
+                            } else {
+                                Log.e("MainActivity", "TelecomManager unavailable!")
                             }
-                            startActivity(intent)
                         }
                     } else {
                         androidx.core.app.ActivityCompat.requestPermissions(
@@ -399,10 +415,6 @@ class MainActivity : AppCompatActivity() {
                             ),
                             101
                         )
-                        val intent = Intent(Intent.ACTION_DIAL, uri).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                        startActivity(intent)
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()

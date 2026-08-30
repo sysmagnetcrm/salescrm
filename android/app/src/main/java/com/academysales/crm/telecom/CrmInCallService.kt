@@ -3,6 +3,7 @@ package com.academysales.crm.telecom
 import android.content.Intent
 import android.net.Uri
 import android.telecom.Call
+import android.telecom.DisconnectCause
 import android.telecom.InCallService
 import android.util.Log
 import java.io.OutputStreamWriter
@@ -73,7 +74,7 @@ class CrmInCallService : InCallService() {
             }
         })
 
-        // Launch Native In-Call UI if enabled
+        // Launch Native In-Call UI Activity
         try {
             val intent = Intent(this, CrmCallActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -93,11 +94,11 @@ class CrmInCallService : InCallService() {
 
         when (state) {
             Call.STATE_CONNECTING, Call.STATE_DIALING -> {
-                logNativeEvent("CALL_STATE_DIALING", callId, currentLeadId, currentPhoneNumber, "State: $state")
+                logNativeEvent("CALL_STATE_DIALING", callId, currentLeadId, currentPhoneNumber, "State: DIALING ($state)")
                 sendBackendStateUpdate(callId, "initiated", mapOf("startedAt" to nowIso))
             }
             Call.STATE_RINGING -> {
-                logNativeEvent("CALL_STATE_RINGING", callId, currentLeadId, currentPhoneNumber, "State: $state")
+                logNativeEvent("CALL_STATE_RINGING", callId, currentLeadId, currentPhoneNumber, "State: RINGING ($state)")
                 sendBackendStateUpdate(callId, "ringing", mapOf("ringingAt" to nowIso))
             }
             Call.STATE_ACTIVE -> {
@@ -111,8 +112,23 @@ class CrmInCallService : InCallService() {
                 logNativeEvent("CALL_STATE_DISCONNECTING", callId, currentLeadId, currentPhoneNumber, "State: DISCONNECTING")
             }
             Call.STATE_DISCONNECTED -> {
-                logNativeEvent("CALL_STATE_DISCONNECTED", callId, currentLeadId, currentPhoneNumber, "State: DISCONNECTED")
-                finalizeCompletedCall(call, "completed")
+                val cause = call.details.disconnectCause
+                logNativeEvent("CALL_STATE_DISCONNECTED", callId, currentLeadId, currentPhoneNumber, "State: DISCONNECTED (cause=${cause.code}, reason=${cause.reason})")
+                val finalOutcome = determineOutcomeFromDisconnectCause(cause.code)
+                finalizeCompletedCall(call, finalOutcome)
+            }
+        }
+    }
+
+    private fun determineOutcomeFromDisconnectCause(causeCode: Int): String {
+        return if (callConnectTimeMillis > 0L) {
+            "completed"
+        } else {
+            when (causeCode) {
+                DisconnectCause.CANCELED -> "cancelled"
+                DisconnectCause.BUSY -> "busy"
+                DisconnectCause.REJECTED, DisconnectCause.MISSED -> "no-answer"
+                else -> "no-answer"
             }
         }
     }
@@ -126,7 +142,9 @@ class CrmInCallService : InCallService() {
             activeCall = null
         }
 
-        finalizeCompletedCall(call, "completed")
+        val causeCode = call.details?.disconnectCause?.code ?: DisconnectCause.UNKNOWN
+        val finalOutcome = determineOutcomeFromDisconnectCause(causeCode)
+        finalizeCompletedCall(call, finalOutcome)
     }
 
     private fun finalizeCompletedCall(call: Call, finalStatus: String) {
@@ -139,14 +157,15 @@ class CrmInCallService : InCallService() {
         val lifecycleSecs = if (callStartTimeMillis > 0L) Math.max(0L, (endedAtMillis - callStartTimeMillis) / 1000) else talkSecs
 
         val callId = currentCallLogId ?: return
-        logNativeEvent("CALL_SESSION_COMPLETED", callId, currentLeadId, currentPhoneNumber, "talkSecs=$talkSecs, lifecycleSecs=$lifecycleSecs")
+        logNativeEvent("CALL_SESSION_COMPLETED", callId, currentLeadId, currentPhoneNumber, "status=$finalStatus, talkSecs=$talkSecs, lifecycleSecs=$lifecycleSecs")
 
         // 1. Send Authoritative Backend State Update
         val payload = mapOf(
             "callStatus" to finalStatus,
             "endedAt" to endedAtIso,
             "durationSeconds" to talkSecs,
-            "lifecycleDurationSeconds" to lifecycleSecs
+            "lifecycleDurationSeconds" to lifecycleSecs,
+            "resolutionSource" to "IN_CALL_SERVICE"
         )
         sendBackendStateUpdate(callId, finalStatus, payload)
 

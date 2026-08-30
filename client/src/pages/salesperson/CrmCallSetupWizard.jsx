@@ -218,7 +218,7 @@ const CrmCallSetupWizard = () => {
       category: 'soft',
       icon: PhoneCall,
       desc: 'Sets CRM as the default native phone dialer for 100% accurate call connect/disconnect tracking & live in-call controls.',
-      granted: true,
+      granted: !!(window.AndroidCRM && typeof window.AndroidCRM.isDefaultDialerHeld === 'function' && window.AndroidCRM.isDefaultDialerHeld()),
       action: () => {
         if (window.AndroidCRM?.requestDefaultDialer) {
           window.AndroidCRM.requestDefaultDialer();
