@@ -78,6 +78,19 @@ export const connectDB = async () => {
     } catch (e) {
       // Ignore — column already exists
     }
+    // Safely add referenceName and referenceNumber columns to Leads table
+    try {
+      await sequelize.query("ALTER TABLE \"Leads\" ADD COLUMN \"referenceName\" VARCHAR(255);");
+      console.log('✅ Added referenceName column to Leads');
+    } catch (e) {
+      // Ignore — column already exists
+    }
+    try {
+      await sequelize.query("ALTER TABLE \"Leads\" ADD COLUMN \"referenceNumber\" VARCHAR(255);");
+      console.log('✅ Added referenceNumber column to Leads');
+    } catch (e) {
+      // Ignore — column already exists
+    }
     try {
       await sequelize.query("UPDATE \"Users\" SET branch = 'kochi' WHERE branch = 'main';");
     } catch (e) {
