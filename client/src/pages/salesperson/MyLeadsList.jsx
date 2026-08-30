@@ -674,7 +674,7 @@ const MyLeadsList = () => {
                 toast.success('Lead created');
                 setShowCreate(false);
                 setCreateForm({ name: '', phone: '', country: 'India', email: '', product: '', source: '', notes: '' });
-                fetchLeads();
+                queryClient.invalidateQueries({ queryKey: ['leads'] });
               } catch (err) {
                 toast.error(err.response?.data?.message || 'Failed to create lead');
               }

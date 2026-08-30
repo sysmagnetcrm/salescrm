@@ -157,57 +157,8 @@ const AllLeads = () => {
     }
   };
 
-  const fetchProducts = async () => {
-    try {
-      const response = await settingsAPI.getProducts();
-      setProducts(response.data.data.map(p => p.name));
-    } catch (error) {
-      // Silently fail if no products
-    }
-  };
 
-  const fetchSalespeople = async () => {
-    try {
-      const response = await userAPI.getSalespeople();
-      setSalespeople(response?.data?.data || []);
-    } catch (error) {
-      // Silently ignore
-    }
-  };
 
-  const getStatusPillClass = (statusValue) => {
-    const status = statuses.find(s => s.value === statusValue);
-    const colorKey = status?.color || 'gray';
-    const conf = COLORS[colorKey] || COLORS['gray'];
-    return `${conf.bg} ${conf.text} ${conf.border} border`;
-  };
-
-  const getStatusRowStyles = (statusValue) => {
-    const status = statuses.find(s => s.value === statusValue);
-    const colorKey = status?.color || 'gray';
-    const conf = COLORS[colorKey] || COLORS['gray'];
-    return {
-      row: conf.row,
-      hover: conf.hover,
-      avatar: `border ${conf.border} ${conf.bg.replace('100', '200')} ${conf.text}`,
-      card: conf.card
-    };
-  };
-
-  const fetchLeads = async () => {
-    setLoading(true);
-    try {
-      const response = await leadAPI.getAllLeads({ ...filters, page, limit: pageSize });
-      const rows = Array.isArray(response.data.data) ? response.data.data : [];
-      setLeads(rows.map((l) => ({ ...l, value: l.value !== undefined && l.value !== null ? Number(l.value) : l.value })));
-      setTotal(response.data.count || 0);
-      setStatusSummary(response.data.statusCounts || {});
-    } catch (error) {
-      toast.error('Failed to load leads');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -399,7 +350,8 @@ const AllLeads = () => {
       toast.success('Lead created');
       setShowCreate(false);
       setCreateForm({ name: '', phone: '', country: 'India', email: '', product: '', source: '', assignedTo: '', notes: '' });
-      fetchLeads();
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create lead');
     }
