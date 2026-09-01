@@ -161,18 +161,27 @@ const LeadCard = ({ lead, onClick }) => {
         <span>Last follow up: {lead?.lastCalled ? format(new Date(lead.lastCalled), 'MMM dd, yyyy') : '-'}</span>
       </div>
 
-      {(lead?.createdAt || !isNaN(adv)) && (
-        <div className="hidden lg:block mt-2 md:mt-3 pt-2 md:pt-3 border-t border-gray-200">
-          {!isNaN(adv) && (
-            <span className="text-sm font-semibold text-gray-900 block">
-              Advance: {adv.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-            </span>
-          )}
-          {lead?.createdAt && (
-            <div className="text-xs text-gray-500 mt-1">
-              Uploaded: {format(new Date(lead.createdAt), 'MMM dd, yyyy')}
-            </div>
-          )}
+      {((lead?.createdAt) || !isNaN(adv) || (lead.totalClearedPayment && Number(lead.totalClearedPayment) > 0)) && (
+        <div className="mt-2 md:mt-3 pt-2 md:pt-3 border-t border-gray-200 flex justify-between items-end">
+          <div>
+            {(!isNaN(adv) && adv > 0) || (lead.totalClearedPayment && Number(lead.totalClearedPayment) > 0) ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  Advance: {Number(!isNaN(adv) && adv > 0 ? adv : lead.totalClearedPayment).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                </span>
+                {(lead.admissionFeeStatus === 'cleared' || (adv >= 1000) || (lead.totalClearedPayment >= 1000)) && (
+                  <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                    ✓ Admission Paid
+                  </span>
+                )}
+              </div>
+            ) : null}
+            {lead?.createdAt && (
+              <div className="text-[11px] text-gray-500 mt-1">
+                Uploaded: {format(new Date(lead.createdAt), 'MMM dd, yyyy')}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

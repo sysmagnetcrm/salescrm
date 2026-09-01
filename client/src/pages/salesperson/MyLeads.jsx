@@ -1,8 +1,20 @@
 import { useState, useEffect } from 'react';
 import { leadAPI } from '../../services/api';
 import LeadCard from '../../components/LeadCard';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import LeadPaymentSection from '../../components/LeadPaymentSection';
+
+const formatCallDuration = (totalSecs) => {
+  const sec = parseInt(totalSecs) || 0;
+  if (sec <= 0) return '0s';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+};
 
 const MyLeads = () => {
   const [leads, setLeads] = useState([]);
@@ -410,8 +422,18 @@ const MyLeads = () => {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Country</p>
-                  <p className="font-semibold text-gray-900">{selectedLead.country || '-'}</p>
+                  <p className="text-sm text-gray-600">Call Duration</p>
+                  <p className="font-bold text-gray-900 font-mono flex items-center gap-1.5 mt-0.5">
+                    <Clock className="w-4 h-4 text-sky-600" />
+                    <span>
+                      {selectedLead.totalCallDuration
+                        ? formatCallDuration(selectedLead.totalCallDuration)
+                        : '0s'}
+                    </span>
+                    <span className="text-xs text-gray-500 font-normal">
+                      ({selectedLead.callCount || 0} calls)
+                    </span>
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Phone</p>

@@ -4,10 +4,22 @@ import { leadAPI, userAPI, settingsAPI, startCrmCall } from '../../services/api'
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import LeadCard from '../../components/LeadCard';
-import { Search, Trash2, Globe2, Package, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Phone, MessageCircle } from 'lucide-react';
+import { Search, Trash2, Globe2, Package, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Phone, MessageCircle, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useBranch } from '../../context/BranchContext';
+import LeadPaymentSection from '../../components/LeadPaymentSection';
+
+const formatCallDuration = (totalSecs) => {
+  const sec = parseInt(totalSecs) || 0;
+  if (sec <= 0) return '0s';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+};
 
 const AllLeads = () => {
   const queryClient = useQueryClient();
@@ -955,21 +967,18 @@ const AllLeads = () => {
                 )}
               </div>
               <div>
-                <p className="text-gray-500">Country</p>
-                <p className="font-semibold">{selectedLead.country || '-'}</p>
-                {/* Country change history */}
-                {Array.isArray(selectedLead.activities) && selectedLead.activities.filter(a => a.newCountry).length > 0 && (
-                  <div className="mt-1 space-y-0.5">
-                    {selectedLead.activities
-                      .filter(a => a.newCountry)
-                      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                      .map((a, idx) => (
-                        <div key={a.id || idx} className="text-xs text-gray-500">
-                          {a.newCountry} • {new Date(a.createdAt).toLocaleString()}
-                        </div>
-                      ))}
-                  </div>
-                )}
+                <p className="text-gray-500">Call Duration</p>
+                <p className="font-bold text-gray-900 font-mono flex items-center gap-1.5 mt-0.5">
+                  <Clock className="w-4 h-4 text-sky-600" />
+                  <span>
+                    {selectedLead.totalCallDuration
+                      ? formatCallDuration(selectedLead.totalCallDuration)
+                      : '0s'}
+                  </span>
+                  <span className="text-xs text-gray-500 font-normal">
+                    ({selectedLead.callCount || 0} calls)
+                  </span>
+                </p>
               </div>
               <div>
                 <p className="text-gray-500">Phone</p>
@@ -1024,6 +1033,17 @@ const AllLeads = () => {
                   Assign
                 </button>
               </div>
+            </div>
+
+            {/* Lead Payment & Fee Lifecycle Section */}
+            <div className="mb-4">
+              <LeadPaymentSection
+                lead={selectedLead}
+                onPaymentRecorded={(updated) => {
+                  setSelectedLead(updated);
+                  queryClient.invalidateQueries({ queryKey: ['leads'] });
+                }}
+              />
             </div>
 
             {/* Update Form */}

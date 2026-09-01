@@ -3,9 +3,21 @@ import { format } from 'date-fns';
 import { leadAPI, settingsAPI, startCrmCall } from '../../services/api';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { Phone, MessageCircle, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Phone, MessageCircle, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext.jsx';
+import LeadPaymentSection from '../../components/LeadPaymentSection';
+
+const formatCallDuration = (totalSecs) => {
+  const sec = parseInt(totalSecs) || 0;
+  if (sec <= 0) return '0s';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+};
 
 // Helpers to format phone numbers with country codes (default India +91)
 // Helpers to format phone numbers with country codes (default India +91)
@@ -167,25 +179,11 @@ const MyLeadsList = () => {
   };
 
   const handleCall = async (lead) => {
-    setSelectedLead(lead);
-    setCallData({
-      note: '',
-      status: '', // Force user to select status (was lead.status)
-      advance: (lead.value !== undefined && lead.value !== null) ? String(Number(lead.value)) : '',
-      country: lead.country || 'India',
-      product: lead.product || ''
-    });
-    localStorage.setItem('pendingCallLog', JSON.stringify({
-      leadId: lead.id,
-      timestamp: Date.now()
-    }));
-    pendingCallRestored.current = true;
-    setShowCallModal(true);
-
     try {
       await startCrmCall(lead);
     } catch (err) {
       console.error('Unified CRM call error:', err);
+      toast.error('Failed to initiate call');
     }
   };
 
@@ -826,23 +824,18 @@ const MyLeadsList = () => {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Country</p>
-                  {isEditing ? (
-                    <select
-                      className="input-field mt-1"
-                      value={editData.country}
-                      onChange={(e) => setEditData({ ...editData, country: e.target.value })}
-                    >
-                      <option value="">Select Country</option>
-                      {countries.map((country) => (
-                        <option key={country} value={country}>
-                          {country}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="font-semibold text-gray-900">{selectedLead.country || '-'}</p>
-                  )}
+                  <p className="text-sm text-gray-600">Call Duration</p>
+                  <p className="font-bold text-gray-900 font-mono flex items-center gap-1.5 mt-0.5">
+                    <Clock className="w-4 h-4 text-sky-600" />
+                    <span>
+                      {selectedLead.totalCallDuration
+                        ? formatCallDuration(selectedLead.totalCallDuration)
+                        : '0s'}
+                    </span>
+                    <span className="text-xs text-gray-500 font-normal">
+                      ({selectedLead.callCount || 0} calls)
+                    </span>
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Phone</p>
@@ -904,6 +897,15 @@ const MyLeadsList = () => {
                   <p className="text-gray-900 bg-gray-50 p-3 rounded-lg">{selectedLead.notes}</p>
                 </div>
               )}
+
+              {/* Lead Payment & Fee Lifecycle Section */}
+              <LeadPaymentSection
+                lead={selectedLead}
+                onPaymentRecorded={(updated) => {
+                  setSelectedLead(updated);
+                  queryClient.invalidateQueries({ queryKey: ['leads'] });
+                }}
+              />
 
               {/* Activities */}
               {selectedLead.activities && selectedLead.activities.length > 0 && (

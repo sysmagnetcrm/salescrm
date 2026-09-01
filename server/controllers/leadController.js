@@ -394,22 +394,31 @@ export const getAllLeads = async (req, res) => {
       offset: parseInt(offset)
     });
 
-    // Item 4: Attach Call Count Aggregation per lead
+    // Attach Call Count & Total Call Duration Aggregation per lead
     const leadIds = rows.map(l => l.id);
     const callCountMap = {};
+    const callDurationMap = {};
     if (leadIds.length > 0) {
-      const callCountsRaw = await CallLog.findAll({
-        attributes: ['leadId', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+      const callStatsRaw = await CallLog.findAll({
+        attributes: [
+          'leadId',
+          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+          [sequelize.fn('SUM', sequelize.col('durationSeconds')), 'totalDuration']
+        ],
         where: { leadId: { [Op.in]: leadIds } },
         group: ['leadId'],
         raw: true
       });
-      callCountsRaw.forEach(c => { callCountMap[c.leadId] = parseInt(c.count) || 0; });
+      callStatsRaw.forEach(c => {
+        callCountMap[c.leadId] = parseInt(c.count) || 0;
+        callDurationMap[c.leadId] = parseInt(c.totalDuration) || 0;
+      });
     }
 
     const rowsWithCallCount = rows.map(l => {
       const plainObj = l.get({ plain: true });
       plainObj.callCount = callCountMap[l.id] || 0;
+      plainObj.totalCallDuration = callDurationMap[l.id] || 0;
       return plainObj;
     });
 
@@ -509,19 +518,28 @@ export const getMyLeads = async (req, res) => {
 
     const leadIds = rows.map(l => l.id);
     const callCountMap = {};
+    const callDurationMap = {};
     if (leadIds.length > 0) {
-      const callCountsRaw = await CallLog.findAll({
-        attributes: ['leadId', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+      const callStatsRaw = await CallLog.findAll({
+        attributes: [
+          'leadId',
+          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+          [sequelize.fn('SUM', sequelize.col('durationSeconds')), 'totalDuration']
+        ],
         where: { leadId: { [Op.in]: leadIds } },
         group: ['leadId'],
         raw: true
       });
-      callCountsRaw.forEach(c => { callCountMap[c.leadId] = parseInt(c.count) || 0; });
+      callStatsRaw.forEach(c => {
+        callCountMap[c.leadId] = parseInt(c.count) || 0;
+        callDurationMap[c.leadId] = parseInt(c.totalDuration) || 0;
+      });
     }
 
     const rowsWithCallCount = rows.map(l => {
       const plainObj = l.get({ plain: true });
       plainObj.callCount = callCountMap[l.id] || 0;
+      plainObj.totalCallDuration = callDurationMap[l.id] || 0;
       return plainObj;
     });
 
@@ -596,9 +614,25 @@ export const getLead = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Lead not found' });
     }
 
+    const callStatsRaw = await CallLog.findAll({
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+        [sequelize.fn('SUM', sequelize.col('durationSeconds')), 'totalDuration']
+      ],
+      where: { leadId: lead.id },
+      raw: true
+    });
+
+    const callCount = parseInt(callStatsRaw[0]?.count) || 0;
+    const totalCallDuration = parseInt(callStatsRaw[0]?.totalDuration) || 0;
+
+    const leadData = lead.get({ plain: true });
+    leadData.callCount = callCount;
+    leadData.totalCallDuration = totalCallDuration;
+
     res.status(200).json({
       success: true,
-      data: lead
+      data: leadData
     });
   } catch (error) {
     res.status(500).json({

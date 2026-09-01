@@ -196,7 +196,8 @@ const Sidebar = () => {
                     { to: '/salesperson/call-setup', icon: CheckCircle2, label: 'CRM Call Setup' },
                     { to: '/salesperson/diagnostics', icon: Settings, label: 'Device Diagnostics' },
                     { to: '/salesperson/call-analytics', icon: FileText, label: 'Call Analytics' },
-                    { to: '/salesperson/leaderboard', icon: Trophy, label: 'Leaderboard' }
+                    { to: '/salesperson/leaderboard', icon: Trophy, label: 'Leaderboard' },
+                    { to: '/salesperson/profile', icon: Settings, label: 'Account Settings' }
                   ].map((link) => {
                     const Icon = link.icon;
                     const isActive = location.pathname === link.to;

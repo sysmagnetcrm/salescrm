@@ -423,7 +423,7 @@ export const getLeaderboard = async (req, res) => {
   }
 };
 
-// @desc    Get status counts for a time period
+// @desc    Get status counts for a time period (Daily, Weekly, Monthly)
 // @route   GET /api/dashboard/status-counts
 // @access  Private/Admin
 export const getStatusCounts = async (req, res) => {
@@ -446,21 +446,42 @@ export const getStatusCounts = async (req, res) => {
     }
 
     const where = {};
-    if (startDate) {
-      where.createdAt = { [Op.gte]: startDate };
-    }
     if (effectiveBranch) {
       where.branch = effectiveBranch;
     }
 
-    const total = await Lead.count({ where });
+    // Filter by activity/creation/update/call date in the given period
+    if (startDate) {
+      where[Op.or] = [
+        { createdAt: { [Op.gte]: startDate } },
+        { updatedAt: { [Op.gte]: startDate } },
+        { lastCalled: { [Op.gte]: startDate } },
+        { lastDispositionAt: { [Op.gte]: startDate } },
+        { closedAt: { [Op.gte]: startDate } }
+      ];
+    }
 
-    const breakdown = await Lead.findAll({
+    let total = await Lead.count({ where });
+
+    let breakdown = await Lead.findAll({
       attributes: ['status', [sequelize.fn('COUNT', sequelize.col('status')), 'count']],
       where,
       group: ['status'],
       raw: true
     });
+
+    // Fallback: If no activity exists in current period (e.g. early morning), query overall branch distribution
+    if (total === 0 && startDate) {
+      const fallbackWhere = {};
+      if (effectiveBranch) fallbackWhere.branch = effectiveBranch;
+      total = await Lead.count({ where: fallbackWhere });
+      breakdown = await Lead.findAll({
+        attributes: ['status', [sequelize.fn('COUNT', sequelize.col('status')), 'count']],
+        where: fallbackWhere,
+        group: ['status'],
+        raw: true
+      });
+    }
 
     const statusCounts = {
       all: total,
@@ -476,13 +497,27 @@ export const getStatusCounts = async (req, res) => {
     };
 
     for (const row of breakdown) {
-      const st = row.status;
+      const st = String(row.status || '').trim().toLowerCase();
       const count = Number(row.count || 0);
-      if (st === 'closed' || st === 'registered') {
+
+      if (st === 'closed' || st === 'registered' || st === 'admission-done' || st === 'orientation-done') {
         statusCounts.registered += count;
         statusCounts.closed += count;
-      } else if (st in statusCounts) {
-        statusCounts[st] += count;
+      } else if (st === 'follow-up' || st === 'interested' || st === 'no-answer' || st === 'busy' || st === 'orientation-scheduled') {
+        statusCounts['follow-up'] += count;
+        statusCounts.interested += count;
+      } else if (st === 'rnr') {
+        statusCounts.rnr += count;
+      } else if (st === 'dead') {
+        statusCounts.dead += count;
+      } else if (st === 'cancelled') {
+        statusCounts.cancelled += count;
+      } else if (st === 'rejected') {
+        statusCounts.rejected += count;
+      } else if (st === 'fresh') {
+        statusCounts.fresh += count;
+      } else {
+        statusCounts.fresh += count;
       }
     }
 

@@ -207,7 +207,33 @@ export const startCrmCall = async (lead) => {
   }
 
   const leadName = lead.name || lead.studentName || lead.fullName || 'Academy CRM Lead';
+
+  // Save mandatory pending call log state for current user
+  try {
+    const rawUser = localStorage.getItem('user');
+    const user = rawUser ? JSON.parse(rawUser) : null;
+    const userId = user?.id || user?._id || 'default';
+    const pendingData = {
+      userId,
+      leadId: lead.id,
+      leadName,
+      phone: lead.phone,
+      currentStatus: lead.status || '',
+      country: lead.country || 'India',
+      product: lead.product || '',
+      value: (lead.value !== undefined && lead.value !== null) ? lead.value : '',
+      timestamp: Date.now()
+    };
+    localStorage.setItem(`pendingCallLog_${userId}`, JSON.stringify(pendingData));
+    localStorage.setItem('pendingCallLog', JSON.stringify(pendingData));
+
+    window.dispatchEvent(new CustomEvent('crmCallStarted', { detail: pendingData }));
+  } catch (err) {
+    console.error('Failed to store pendingCallLog:', err);
+  }
+
   if (window.AndroidCRM?.placeTelecomCall) {
+    const token = localStorage.getItem('token') || '';
     window.AndroidCRM.placeTelecomCall(lead.phone, lead.id, callId, leadName, token);
   } else {
     const formattedPhone = String(lead.phone).replace(/[^0-9+]/g, '');

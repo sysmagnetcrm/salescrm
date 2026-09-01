@@ -51,6 +51,7 @@ import MobileBottomNav from './components/MobileBottomNav';
 import NetworkBanner from './components/NetworkBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import ActiveCallController from './components/ActiveCallController';
+import MandatoryCallLogModal from './components/MandatoryCallLogModal';
 
 // Persistent Application Shell — Navbar, Sidebar & Main Content Outlet stay mounted during route transitions
 const AppShell = () => (
@@ -69,6 +70,7 @@ const AppShell = () => (
     </div>
     <MobileBottomNav />
     <ActiveCallController />
+    <MandatoryCallLogModal />
   </div>
 );
 
@@ -125,7 +127,8 @@ const router = createBrowserRouter([
       { path: 'diagnostics', element: <DeviceDiagnostics /> },
       { path: 'call-analytics', element: <CallAnalyticsDashboard /> },
       { path: 'call-setup', element: <CrmCallSetupWizard /> },
-      { path: 'leaderboard', element: <Leaderboard /> }
+      { path: 'leaderboard', element: <Leaderboard /> },
+      { path: 'profile', element: <AdminProfile /> }
     ]
   },
   // Default redirect

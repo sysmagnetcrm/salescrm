@@ -1,271 +1,328 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardAPI } from '../services/api';
-import { Trophy, Award, TrendingUp, Star } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { 
+  Trophy, Award, Star, Flame, Zap, Search, ArrowUpRight, 
+  Crown, Sparkles, CheckCircle2, UserCheck
+} from 'lucide-react';
 import { useBranch } from '../context/BranchContext';
 import { useAuth } from '../context/AuthContext';
 
 const Leaderboard = () => {
   const { branch } = useBranch();
   const { user } = useAuth();
-  const [period, setPeriod] = useState('month');
+  const [period, setPeriod] = useState('month'); // 'week' | 'month' | 'all'
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: leaderboard = [], isLoading } = useQuery({
     queryKey: ['leaderboard', period, branch],
-    queryFn: () => dashboardAPI.getLeaderboard({ period, branch }).then(r => r.data.data || []),
-    staleTime: 120000
+    queryFn: () => dashboardAPI.getLeaderboard({ period: period === 'all' ? 'month' : period, branch }).then(r => r.data.data || []),
+    staleTime: 60000
   });
 
-  const getMedalColor = (rank) => {
-    switch (rank) {
-      case 1:
-        return 'text-yellow-500 bg-yellow-50 border-yellow-200';
-      case 2:
-        return 'text-gray-400 bg-gray-50 border-gray-200';
-      case 3:
-        return 'text-amber-600 bg-amber-50 border-amber-200';
-      default:
-        return 'text-gray-600 bg-gray-50 border-gray-100';
-    }
+  const filteredLeaderboard = leaderboard.filter(sp => 
+    sp.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    sp.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const formatInr = (amount) => {
+    const val = Number(amount || 0);
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(val);
   };
 
-  const getMedalIcon = (rank) => {
-    switch (rank) {
-      case 1:
-        return <Trophy className="h-6 w-6 text-yellow-500" />;
-      case 2:
-        return <Award className="h-6 w-6 text-gray-400" />;
-      case 3:
-        return <Award className="h-6 w-6 text-amber-600" />;
-      default:
-        return <Star className="h-5 w-5 text-gray-400" />;
-    }
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
   };
+
+  const top1 = leaderboard[0];
+  const top2 = leaderboard[1];
+  const top3 = leaderboard[2];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Trophy className="h-7 w-7 text-yellow-500" />
-            Sales Leaderboard
-          </h1>
-          <p className="text-sm text-gray-500">Top performers based on closed leads and conversions</p>
-        </div>
+    <div className="space-y-8 max-w-6xl mx-auto pb-12">
+      {/* Top Banner */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-amber-600 via-yellow-600 to-amber-700 text-white p-8 rounded-3xl shadow-xl">
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/20 text-yellow-100 text-xs font-bold backdrop-blur-md">
+              <Crown className="w-4 h-4 text-amber-200 fill-amber-200" />
+              <span>Sales Wall of Fame & Gamified Ranking</span>
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
+              Sales Champions Leaderboard
+            </h1>
+            <p className="text-yellow-100 text-sm max-w-xl">
+              Real-time rankings based on registrations, admissions fee collection, and total conversion revenue.
+            </p>
+          </div>
 
-        {/* Period Selector */}
-        <div className="inline-flex p-1 bg-gray-100 rounded-lg">
-          <button
-            onClick={() => setPeriod('week')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              period === 'week'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Weekly
-          </button>
-          <button
-            onClick={() => setPeriod('month')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              period === 'month'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Monthly
-          </button>
+          {/* Period Toggle */}
+          <div className="inline-flex p-1.5 bg-black/20 backdrop-blur-md rounded-2xl border border-white/20">
+            {[
+              { id: 'week', label: 'This Week' },
+              { id: 'month', label: 'This Month' },
+              { id: 'all', label: 'All Time' }
+            ].map(p => (
+              <button
+                key={p.id}
+                onClick={() => setPeriod(p.id)}
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+                  period === p.id
+                    ? 'bg-white text-amber-900 shadow-lg scale-[1.02]'
+                    : 'text-amber-100 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Top 3 Performers Cards */}
-      {isLoading && !leaderboard.length ? (
+      {/* Champion Podium (Top 3) */}
+      {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-44 bg-gray-200 animate-pulse rounded-2xl" />
+            <div key={i} className="h-56 bg-gray-200 animate-pulse rounded-3xl" />
           ))}
         </div>
       ) : (
-        leaderboard.length >= 3 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* 2nd Place */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center relative overflow-hidden order-2 md:order-1">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gray-50 rounded-bl-full -z-0" />
-              <div className="p-3 bg-gray-100 rounded-full mb-3 z-10">
-                {getMedalIcon(2)}
-              </div>
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">2nd Place</span>
-              <h3 className="text-lg font-bold text-gray-900 z-10">{leaderboard[1]?.name}</h3>
-              <p className="text-xs text-gray-500 mb-4">{leaderboard[1]?.email}</p>
-              <div className="w-full pt-4 border-t border-gray-100 grid grid-cols-2 gap-2 text-center">
-                <div>
-                  <p className="text-xs text-gray-500">Conversions</p>
-                  <p className="text-lg font-bold text-primary-600">{leaderboard[1]?.closedLeads}</p>
+        leaderboard.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end pt-4">
+            {/* 2nd Place Silver */}
+            {top2 ? (
+              <div className="bg-gradient-to-b from-slate-50 to-white p-6 rounded-3xl border-2 border-slate-200 shadow-md flex flex-col items-center text-center relative overflow-hidden order-2 md:order-1 hover:shadow-xl transition-all">
+                <div className="absolute top-3 left-3 bg-slate-200 text-slate-700 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                  2nd Rank
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">Revenue</p>
-                  <p className="text-lg font-bold text-green-600">₹{Number(leaderboard[1]?.revenue || 0).toLocaleString('en-IN')}</p>
+                <div className="relative mb-3 mt-2">
+                  <div className="w-16 h-16 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-extrabold text-xl shadow-inner border-2 border-slate-300">
+                    {getInitials(top2.name)}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 p-1.5 bg-slate-400 text-white rounded-full shadow">
+                    <Award className="w-4 h-4" />
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            {/* 1st Place */}
-            <div className="bg-white p-6 rounded-2xl shadow-md border-2 border-yellow-200 flex flex-col items-center text-center relative overflow-hidden order-1 md:order-2 transform md:-translate-y-2">
-              <div className="absolute top-0 right-0 w-28 h-28 bg-yellow-50 rounded-bl-full -z-0" />
-              <div className="p-4 bg-yellow-100 rounded-full mb-3 z-10">
-                {getMedalIcon(1)}
-              </div>
-              <span className="text-xs font-bold uppercase tracking-wider text-yellow-600 mb-1">Champion</span>
-              <h3 className="text-xl font-bold text-gray-900 z-10">{leaderboard[0]?.name}</h3>
-              <p className="text-xs text-gray-500 mb-4">{leaderboard[0]?.email}</p>
-              <div className="w-full pt-4 border-t border-gray-100 grid grid-cols-2 gap-2 text-center">
-                <div>
-                  <p className="text-xs text-gray-500">Conversions</p>
-                  <p className="text-xl font-bold text-primary-600">{leaderboard[0]?.closedLeads}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Revenue</p>
-                  <p className="text-xl font-bold text-green-600">₹{Number(leaderboard[0]?.revenue || 0).toLocaleString('en-IN')}</p>
-                </div>
-              </div>
-            </div>
+                <h3 className="text-lg font-bold text-gray-900">{top2.name}</h3>
+                <p className="text-xs text-gray-400 mb-4">{top2.email}</p>
 
-            {/* 3rd Place */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center relative overflow-hidden order-3">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-bl-full -z-0" />
-              <div className="p-3 bg-amber-100 rounded-full mb-3 z-10">
-                {getMedalIcon(3)}
-              </div>
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-600 mb-1">3rd Place</span>
-              <h3 className="text-lg font-bold text-gray-900 z-10">{leaderboard[2]?.name}</h3>
-              <p className="text-xs text-gray-500 mb-4">{leaderboard[2]?.email}</p>
-              <div className="w-full pt-4 border-t border-gray-100 grid grid-cols-2 gap-2 text-center">
-                <div>
-                  <p className="text-xs text-gray-500">Conversions</p>
-                  <p className="text-lg font-bold text-primary-600">{leaderboard[2]?.closedLeads}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Revenue</p>
-                  <p className="text-lg font-bold text-green-600">₹{Number(leaderboard[2]?.revenue || 0).toLocaleString('en-IN')}</p>
+                <div className="w-full pt-4 border-t border-slate-100 grid grid-cols-2 gap-2 text-center bg-slate-50/80 p-3 rounded-2xl">
+                  <div>
+                    <span className="text-[11px] text-gray-500 block font-medium">Registrations</span>
+                    <span className="text-base font-extrabold text-slate-800">{top2.closedLeads}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-gray-500 block font-medium">Revenue</span>
+                    <span className="text-base font-extrabold text-emerald-600">{formatInr(top2.revenue)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : <div className="hidden md:block" />}
+
+            {/* 1st Place Gold Champion */}
+            {top1 && (
+              <div className="bg-gradient-to-b from-amber-500 via-amber-400 to-yellow-500 p-7 rounded-3xl border-4 border-amber-300 shadow-2xl flex flex-col items-center text-center relative overflow-hidden order-1 md:order-2 transform md:-translate-y-4 text-slate-900 hover:scale-[1.02] transition-all">
+                <div className="absolute top-3 left-3 bg-amber-900 text-amber-100 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow flex items-center gap-1">
+                  <Crown className="w-3 h-3 text-amber-300 fill-amber-300" />
+                  1st Champion
+                </div>
+
+                <div className="relative mb-3 mt-4">
+                  <div className="w-20 h-20 rounded-full bg-amber-950 text-amber-200 flex items-center justify-center font-black text-2xl shadow-2xl border-4 border-amber-300">
+                    {getInitials(top1.name)}
+                  </div>
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 p-1.5 bg-yellow-300 text-amber-950 rounded-full shadow-lg border border-amber-400 animate-bounce">
+                    <Sparkles className="w-4 h-4 fill-amber-950" />
+                  </div>
+                </div>
+
+                <h3 className="text-xl font-extrabold text-amber-950">{top1.name}</h3>
+                <p className="text-xs text-amber-900/80 mb-4 font-medium">{top1.email}</p>
+
+                <div className="w-full pt-4 border-t border-amber-400/40 grid grid-cols-2 gap-2 text-center bg-amber-950/10 p-3.5 rounded-2xl backdrop-blur-sm">
+                  <div>
+                    <span className="text-[11px] text-amber-950 font-bold block">Registrations</span>
+                    <span className="text-xl font-black text-amber-950">{top1.closedLeads}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-amber-950 font-bold block">Total Revenue</span>
+                    <span className="text-xl font-black text-amber-950">{formatInr(top1.revenue)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3rd Place Bronze */}
+            {top3 ? (
+              <div className="bg-gradient-to-b from-amber-50/70 to-white p-6 rounded-3xl border-2 border-amber-200/80 shadow-md flex flex-col items-center text-center relative overflow-hidden order-3 hover:shadow-xl transition-all">
+                <div className="absolute top-3 left-3 bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                  3rd Rank
+                </div>
+                <div className="relative mb-3 mt-2">
+                  <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-extrabold text-xl shadow-inner border-2 border-amber-200">
+                    {getInitials(top3.name)}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 p-1.5 bg-amber-700 text-white rounded-full shadow">
+                    <Star className="w-4 h-4 fill-white" />
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-bold text-gray-900">{top3.name}</h3>
+                <p className="text-xs text-gray-400 mb-4">{top3.email}</p>
+
+                <div className="w-full pt-4 border-t border-amber-100 grid grid-cols-2 gap-2 text-center bg-amber-50/60 p-3 rounded-2xl">
+                  <div>
+                    <span className="text-[11px] text-gray-500 block font-medium">Registrations</span>
+                    <span className="text-base font-extrabold text-amber-800">{top3.closedLeads}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-gray-500 block font-medium">Revenue</span>
+                    <span className="text-base font-extrabold text-emerald-600">{formatInr(top3.revenue)}</span>
+                  </div>
+                </div>
+              </div>
+            ) : <div className="hidden md:block" />}
           </div>
         )
       )}
 
-      {/* Full Leaderboard Table (Desktop) & Cards (Mobile) */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900">Complete Rankings</h2>
+      {/* Search & Full Leaderboard Table */}
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden space-y-4 p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500" />
+              Complete Rankings Matrix
+            </h2>
+            <p className="text-xs text-gray-500">Showing {filteredLeaderboard.length} salesperson entries</p>
+          </div>
+
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search BDE by name..."
+              className="input-field pl-9 w-full text-xs"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
 
-        {/* DESKTOP TABLE */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3">Rank</th>
-                <th className="px-6 py-3">Salesperson</th>
-                <th className="px-6 py-3 text-center">Conversions</th>
-                <th className="px-6 py-3 text-center">Total Leads</th>
-                <th className="px-6 py-3 text-center">Conversion Rate</th>
-                <th className="px-6 py-3 text-right">Revenue Generated</th>
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                <th className="py-3.5 px-4">Rank</th>
+                <th className="py-3.5 px-4">Salesperson</th>
+                <th className="py-3.5 px-4 text-center">Total Assigned</th>
+                <th className="py-3.5 px-4 text-center">Conversions</th>
+                <th className="py-3.5 px-4 text-center">Conversion Rate</th>
+                <th className="py-3.5 px-4 text-right">Revenue Collected</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {leaderboard.map((item, index) => {
-                const rank = index + 1;
-                const isCurrentUser = user?.id && String(user.id) === String(item.id);
+            <tbody className="divide-y divide-gray-100 font-medium">
+              {filteredLeaderboard.map((sp, idx) => {
+                const isCurrentUser = user && (user.id === sp.id || user.email === sp.email);
+                const rank = sp.rank || idx + 1;
+                const conversionRate = parseFloat(sp.conversionRate || 0);
+
                 return (
-                  <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors ${isCurrentUser ? 'bg-primary-50/60 font-semibold' : ''}`}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border ${getMedalColor(rank)}`}>
-                          {rank}
+                  <tr
+                    key={sp.id || idx}
+                    className={`transition-colors ${
+                      isCurrentUser
+                        ? 'bg-amber-50/70 hover:bg-amber-100/70 border-l-4 border-amber-500'
+                        : 'hover:bg-gray-50/80'
+                    }`}
+                  >
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold ${
+                          rank === 1 ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                          rank === 2 ? 'bg-slate-200 text-slate-800' :
+                          rank === 3 ? 'bg-amber-200/60 text-amber-900' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          #{rank}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-semibold text-gray-900 flex items-center gap-1.5">
-                        <span>{item.name}</span>
                         {isCurrentUser && (
-                          <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-primary-600 text-white">YOU</span>
+                          <span className="text-[10px] bg-amber-500 text-white font-bold px-1.5 py-0.5 rounded-md">
+                            YOU
+                          </span>
                         )}
                       </div>
-                      <div className="text-xs text-gray-500">{item.email}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-green-600">
-                      {item.closedLeads}
+
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                          {getInitials(sp.name)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 flex items-center gap-1.5">
+                            {sp.name}
+                            {rank === 1 && <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />}
+                          </p>
+                          <p className="text-xs text-gray-400 font-normal">{sp.email}</p>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-gray-600">
-                      {item.totalLeads}
+
+                    <td className="py-4 px-4 text-center whitespace-nowrap font-mono text-gray-700">
+                      {sp.totalLeads || 0}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                        {item.totalLeads > 0 ? ((item.closedLeads / item.totalLeads) * 100).toFixed(1) : 0}%
+
+                    <td className="py-4 px-4 text-center whitespace-nowrap">
+                      <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-xs">
+                        {sp.closedLeads || 0} registered
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-gray-900">
-                      ₹{Number(item.revenue || 0).toLocaleString('en-IN')}
+
+                    <td className="py-4 px-4 text-center whitespace-nowrap">
+                      <div className="w-32 mx-auto space-y-1">
+                        <div className="flex justify-between text-[11px] font-semibold text-gray-600">
+                          <span>{conversionRate}%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              conversionRate >= 20 ? 'bg-emerald-500' :
+                              conversionRate >= 10 ? 'bg-indigo-500' :
+                              'bg-amber-500'
+                            }`}
+                            style={{ width: `${Math.min(conversionRate, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="py-4 px-4 text-right whitespace-nowrap font-mono font-bold text-emerald-600">
+                      {formatInr(sp.revenue)}
                     </td>
                   </tr>
                 );
               })}
-              {leaderboard.length === 0 && !isLoading && (
+
+              {filteredLeaderboard.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                    No leaderboard data available.
+                  <td colSpan={6} className="py-8 text-center text-gray-400 italic">
+                    No leaderboard data matches the selected query
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
-
-        {/* MOBILE CARDS */}
-        <div className="md:hidden space-y-2.5 p-3 bg-gray-50/50">
-          {leaderboard.map((item, index) => {
-            const rank = index + 1;
-            const isCurrentUser = user?.id && String(user.id) === String(item.id);
-            return (
-              <div
-                key={item.id}
-                className={`p-3 bg-white rounded-xl shadow-sm border transition-all ${
-                  isCurrentUser ? 'border-primary-500 ring-2 ring-primary-500/20 bg-primary-50/30' : 'border-gray-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs border ${getMedalColor(rank)}`}>
-                      {rank}
-                    </span>
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1">
-                        <span>{item.name}</span>
-                        {isCurrentUser && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-primary-600 text-white">YOU</span>
-                        )}
-                      </h3>
-                      <p className="text-[11px] text-gray-500">{item.closedLeads} conversions ({item.totalLeads > 0 ? ((item.closedLeads / item.totalLeads) * 100).toFixed(0) : 0}%)</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-black text-emerald-600 block">
-                      ₹{Number(item.revenue || 0).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {leaderboard.length === 0 && !isLoading && (
-            <div className="p-6 text-center text-gray-400 text-xs">
-              No leaderboard data available.
-            </div>
-          )}
         </div>
       </div>
     </div>
