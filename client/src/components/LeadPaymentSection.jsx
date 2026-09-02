@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, CheckCircle2, Clock, AlertCircle, PlusCircle, ArrowUpRight, DollarSign, Receipt, Sparkles } from 'lucide-react';
+import { CreditCard, CheckCircle2, Clock, AlertCircle, PlusCircle, ArrowUpRight, IndianRupee, Receipt, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { paymentAPI, leadAPI } from '../services/api';
 import { useQueryClient } from '@tanstack/react-query';

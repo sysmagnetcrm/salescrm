@@ -12,7 +12,7 @@ import {
   MessageCircle,
   Check,
   Zap,
-  DollarSign,
+  IndianRupee,
   AlertCircle,
   ChevronDown,
   ChevronUp
@@ -852,7 +852,7 @@ const LeadQueueView = () => {
                     disabled={recordingPayment}
                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1"
                   >
-                    <DollarSign className="h-3.5 w-3.5" />
+                    <IndianRupee className="h-3.5 w-3.5" />
                     <span>{recordingPayment ? 'Recording...' : 'Record Payment'}</span>
                   </button>
                 </form>

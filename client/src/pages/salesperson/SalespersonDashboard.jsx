@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardAPI } from '../../services/api';
 import StatCard from '../../components/StatCard';
-import { ClipboardList, Phone, CheckCircle, DollarSign, Target, Activity, Calendar } from 'lucide-react';
+import { ClipboardList, Phone, CheckCircle, IndianRupee, Target, Activity, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
 
@@ -76,7 +76,7 @@ const SalespersonDashboard = () => {
           <StatCard
             title="Revenue"
             value={formatCurrency(overview?.totalRevenue)}
-            icon={DollarSign}
+            icon={IndianRupee}
             color="purple"
           />
         </div>
