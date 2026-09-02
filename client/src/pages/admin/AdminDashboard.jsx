@@ -159,18 +159,16 @@ const AdminDashboard = () => {
   return (
     <div className="space-y-6">
       <StaleLeadsNotification />
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
-          <p className="text-sm text-gray-500">Real-time performance and sales metrics</p>
-        </div>
+      <div className="relative overflow-hidden bg-gradient-to-r from-amber-50/80 via-rose-50/30 to-slate-50 rounded-3xl p-6 md:p-8 text-slate-900 shadow-sm border border-amber-100/60 backdrop-blur-md">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard Overview</h1>
+        <p className="text-slate-500 text-xs mt-0.5 font-medium">Real-time performance, status summaries & sales metrics</p>
       </div>
 
       {/* Summary Status Cards */}
       {isDashLoading && !dashboardData ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="h-28 bg-gray-200 animate-pulse rounded-xl" />
+            <div key={i} className="h-28 bg-slate-100 animate-pulse rounded-3xl" />
           ))}
         </div>
       ) : (
@@ -182,13 +180,13 @@ const AdminDashboard = () => {
       )}
 
       {/* Status Summary Boards — Daily / Weekly / Monthly */}
-      <div className="space-y-4">
+      <div className="space-y-5">
         {[
-          { label: 'Daily Activity', period: 'daily', counts: dailyCounts, icon: '📅', grad: 'from-blue-50 to-indigo-50', border: 'border-blue-100' },
-          { label: 'Weekly Activity', period: 'weekly', counts: weeklyCounts, icon: '📊', grad: 'from-violet-50 to-purple-50', border: 'border-violet-100' },
-          { label: 'Monthly Activity', period: 'monthly', counts: monthlyCounts, icon: '📈', grad: 'from-emerald-50 to-teal-50', border: 'border-emerald-100' }
+          { label: 'Daily Activity', period: 'daily', counts: dailyCounts, icon: '📅', grad: 'from-amber-50/70 via-orange-50/40 to-slate-50', border: 'border-amber-100/60' },
+          { label: 'Weekly Activity', period: 'weekly', counts: weeklyCounts, icon: '📊', grad: 'from-purple-50/70 via-indigo-50/40 to-slate-50', border: 'border-purple-100/60' },
+          { label: 'Monthly Activity', period: 'monthly', counts: monthlyCounts, icon: '📈', grad: 'from-emerald-50/70 via-teal-50/40 to-slate-50', border: 'border-emerald-100/60' }
         ].map(({ label, period, counts, icon, grad, border }) => (
-          <div key={period} className={`bg-gradient-to-r ${grad} rounded-2xl border ${border} p-5 shadow-sm`}>
+          <div key={period} className={`bg-gradient-to-r ${grad} rounded-3xl border ${border} p-6 shadow-sm backdrop-blur-md`}>
             <StatusSummaryBoard counts={counts} label={`${icon} ${label}`} period={period} />
           </div>
         ))}
