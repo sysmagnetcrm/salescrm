@@ -180,21 +180,28 @@ export const startCrmCall = async (lead) => {
     throw new Error('Invalid lead information for calling.');
   }
 
+  const dialerMode = localStorage.getItem('crm_dialer_mode') || 'internal';
+
   if (window.AndroidCRM?.getCallCapability) {
     const capability = window.AndroidCRM.getCallCapability();
     console.log('[AndroidCRMBridge] Device call capability:', capability);
   }
 
-  const res = await callAPI.logCall({
-    leadId: lead.id,
-    phoneNumber: lead.phone,
-    callStatus: 'initiated',
-    callDirection: 'outbound',
-    startedAt: new Date()
-  });
-
-  const callLogData = res.data?.data || res.data;
-  const callId = callLogData?.id || '';
+  let callLogData = null;
+  let callId = '';
+  try {
+    const res = await callAPI.logCall({
+      leadId: lead.id,
+      phoneNumber: lead.phone,
+      callStatus: 'initiated',
+      callDirection: 'outbound',
+      startedAt: new Date()
+    });
+    callLogData = res.data?.data || res.data;
+    callId = callLogData?.id || '';
+  } catch (err) {
+    console.error('Failed to log call to server:', err);
+  }
 
   if (callId && window.AndroidCRM?.startCallRecording) {
     window.AndroidCRM.startCallRecording(callId);
@@ -222,7 +229,9 @@ export const startCrmCall = async (lead) => {
       country: lead.country || 'India',
       product: lead.product || '',
       value: (lead.value !== undefined && lead.value !== null) ? lead.value : '',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      callId,
+      dialerMode
     };
     localStorage.setItem(`pendingCallLog_${userId}`, JSON.stringify(pendingData));
     localStorage.setItem('pendingCallLog', JSON.stringify(pendingData));
@@ -234,7 +243,7 @@ export const startCrmCall = async (lead) => {
 
   if (window.AndroidCRM?.placeTelecomCall) {
     const token = localStorage.getItem('token') || '';
-    window.AndroidCRM.placeTelecomCall(lead.phone, lead.id, callId, leadName, token);
+    window.AndroidCRM.placeTelecomCall(lead.phone, lead.id, callId, leadName, token, dialerMode);
   } else {
     const formattedPhone = String(lead.phone).replace(/[^0-9+]/g, '');
     window.location.href = `tel:${formattedPhone}`;

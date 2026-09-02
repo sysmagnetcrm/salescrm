@@ -2,14 +2,15 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Activity, RefreshCw, Smartphone, ShieldCheck, Server, Phone, PhoneCall,
   PhoneIncoming, PhoneMissed, Clock, Mic, MicOff, CheckCircle2, AlertCircle,
-  ChevronDown, X, FileText, Radio, Wifi, WifiOff, Play, Upload, Sparkles
+  ChevronDown, X, FileText, Radio, Wifi, WifiOff, Play, Upload, Sparkles,
+  PhoneOff, Settings2, ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
 // ─── Helper formatters ─────────────────────────────────────────────────────────
 const formatDuration = (secs) => {
-  if (!secs && secs !== 0) return '--:--';
+  if (!secs && secs !== 0) return '00:00';
   const s = Math.floor(secs);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
@@ -75,7 +76,6 @@ const PostCallModal = ({ callEvent, onClose, onSave }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md">
       <div className="bg-white/95 backdrop-blur-xl w-full max-w-md rounded-3xl shadow-2xl border border-amber-100/60 overflow-hidden">
-        {/* Header */}
         <div className="bg-gradient-to-r from-amber-50/90 via-rose-50/50 to-slate-50 p-6 border-b border-amber-100/40">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
@@ -94,7 +94,6 @@ const PostCallModal = ({ callEvent, onClose, onSave }) => {
           </p>
         </div>
 
-        {/* Body */}
         <div className="p-6 space-y-4">
           <div className="flex items-center gap-3 p-3.5 bg-slate-50/70 rounded-2xl border border-slate-100">
             <div className="p-2 bg-emerald-100/60 text-emerald-700 rounded-xl">
@@ -159,8 +158,8 @@ const PostCallModal = ({ callEvent, onClose, onSave }) => {
   );
 };
 
-// ─── Live Call Banner ─────────────────────────────────────────────────────────
-const LiveCallBanner = ({ activeCall }) => {
+// ─── Live Call Banner with Dismiss & End Call Buttons ─────────────────────────
+const LiveCallBanner = ({ activeCall, onDismiss }) => {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -175,23 +174,44 @@ const LiveCallBanner = ({ activeCall }) => {
   if (!activeCall) return null;
 
   return (
-    <div className="relative overflow-hidden bg-gradient-to-r from-amber-50/90 via-emerald-50/80 to-teal-50/90 rounded-3xl p-5 text-slate-800 shadow-sm border border-emerald-200/60 backdrop-blur-md">
-      <div className="relative flex items-center justify-between">
+    <div className="relative overflow-hidden bg-gradient-to-r from-amber-50/95 via-emerald-50/90 to-teal-50/95 rounded-3xl p-5 text-slate-800 shadow-md border border-emerald-200/70 backdrop-blur-md">
+      <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-2xl bg-emerald-100 text-emerald-800 shadow-sm">
+          <div className="p-3 rounded-2xl bg-emerald-100 text-emerald-800 shadow-sm shrink-0">
             <PhoneCall className="h-5 w-5 animate-pulse" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold tracking-wider text-emerald-800 uppercase">Live Call in Progress</p>
-            <p className="font-bold text-base text-slate-900">{activeCall.leadName || activeCall.phone}</p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] font-bold tracking-wider text-emerald-800 uppercase">
+                {activeCall.status === 'connected' ? 'Live Call in Progress' : 'Dialing / Initiating Call...'}
+              </p>
+              <span className="px-2 py-0.5 text-[9px] font-extrabold rounded-full bg-emerald-200/80 text-emerald-900 animate-pulse">
+                ACTIVE
+              </span>
+            </div>
+            <p className="font-bold text-base text-slate-900 truncate">{activeCall.leadName || activeCall.phone}</p>
             <p className="text-xs text-slate-500">{activeCall.phone}</p>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-2xl font-mono font-extrabold text-slate-900 tabular-nums">{formatDuration(elapsed)}</div>
-          <div className="flex items-center justify-end gap-1.5 mt-1">
-            <Radio className="h-3 w-3 text-emerald-600 animate-pulse" />
-            <span className="text-xs font-semibold text-emerald-700">Recording</span>
+
+        <div className="flex items-center justify-between sm:justify-end gap-4">
+          <div className="text-right">
+            <div className="text-2xl font-mono font-extrabold text-slate-900 tabular-nums">{formatDuration(elapsed)}</div>
+            <div className="flex items-center justify-end gap-1.5 mt-0.5">
+              <Radio className="h-3 w-3 text-emerald-600 animate-pulse" />
+              <span className="text-xs font-semibold text-emerald-700">Recording</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onDismiss}
+              className="inline-flex items-center gap-1 px-3 py-2 text-xs font-bold rounded-2xl bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300/60 shadow-sm transition-all"
+              title="Close or End Call Section"
+            >
+              <PhoneOff className="h-3.5 w-3.5" />
+              <span>Close / End Call</span>
+            </button>
           </div>
         </div>
       </div>
@@ -212,6 +232,7 @@ const CallMonitor = () => {
   const [postCallEvent, setPostCallEvent] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [dialerMode, setDialerMode] = useState(() => localStorage.getItem('crm_dialer_mode') || 'internal');
   const isAndroid = typeof window !== 'undefined' && !!window.AndroidCRM;
 
   const fetchNativeStatus = useCallback(() => {
@@ -244,6 +265,28 @@ const CallMonitor = () => {
     }
   }, []);
 
+  const handleDialerModeChange = (newMode) => {
+    setDialerMode(newMode);
+    localStorage.setItem('crm_dialer_mode', newMode);
+    if (window.AndroidCRM?.setDialerMode) {
+      window.AndroidCRM.setDialerMode(newMode);
+    }
+    toast.success(`Switched to ${newMode === 'system' ? 'System Phone App' : 'CRM Default Dialer'} mode`);
+  };
+
+  const handleDismissActiveCall = () => {
+    if (activeCall?.callId && window.AndroidCRM?.endCall) {
+      try { window.AndroidCRM.endCall(activeCall.callId); } catch (_) {}
+    }
+    setActiveCall(null);
+    localStorage.removeItem('pendingCallLog');
+    const rawUser = localStorage.getItem('user');
+    const user = rawUser ? JSON.parse(rawUser) : null;
+    const userId = user?.id || user?._id || 'default';
+    localStorage.removeItem(`pendingCallLog_${userId}`);
+    toast.success('Call section closed');
+  };
+
   useEffect(() => {
     window.onNativeCallStateChange = (callId, status, durationSecs) => {
       if (status === 'connected') {
@@ -251,11 +294,32 @@ const CallMonitor = () => {
       } else if (['completed', 'no-answer', 'busy', 'cancelled', 'failed'].includes(status)) {
         const endedCall = { ...activeCall, callId, status, durationSeconds: Number(durationSecs) };
         setActiveCall(null);
+        localStorage.removeItem('pendingCallLog');
         if (status === 'completed' && durationSecs > 0) {
           setPostCallEvent(endedCall);
         }
         setTimeout(fetchHistory, 1500);
       }
+    };
+
+    const handleCrmCallStarted = (e) => {
+      if (e?.detail) {
+        setActiveCall({
+          callId: e.detail.callId,
+          leadId: e.detail.leadId,
+          leadName: e.detail.leadName,
+          phone: e.detail.phone,
+          connectedAt: null,
+          status: 'ringing'
+        });
+      }
+    };
+
+    const handleCrmCallError = (e) => {
+      const msg = e?.detail?.message || 'Call failed. Please verify phone permissions.';
+      toast.error(`⚠️ ${msg}`, { duration: 5000 });
+      setActiveCall(null);
+      localStorage.removeItem('pendingCallLog');
     };
 
     const handleCrmCallEvent = (e) => {
@@ -281,6 +345,7 @@ const CallMonitor = () => {
             durationSeconds: Number(ev.extra?.durationSeconds || 0),
           };
           setActiveCall(null);
+          localStorage.removeItem('pendingCallLog');
           if (ended.status === 'completed' && ended.durationSeconds > 0) {
             setPostCallEvent(ended);
           }
@@ -298,8 +363,15 @@ const CallMonitor = () => {
       } catch (_) {}
     };
 
+    window.addEventListener('crmCallStarted', handleCrmCallStarted);
+    window.addEventListener('crmCallError', handleCrmCallError);
     window.addEventListener('crmCallEvent', handleCrmCallEvent);
-    return () => window.removeEventListener('crmCallEvent', handleCrmCallEvent);
+
+    return () => {
+      window.removeEventListener('crmCallStarted', handleCrmCallStarted);
+      window.removeEventListener('crmCallError', handleCrmCallError);
+      window.removeEventListener('crmCallEvent', handleCrmCallEvent);
+    };
   }, [activeCall, fetchHistory]);
 
   useEffect(() => {
@@ -363,8 +435,82 @@ const CallMonitor = () => {
         </div>
       </div>
 
-      {/* ── Live Call Banner ── */}
-      {activeCall && <LiveCallBanner activeCall={activeCall} />}
+      {/* ── Live Call Banner with Dismiss Button ── */}
+      {activeCall && (
+        <LiveCallBanner
+          activeCall={activeCall}
+          onDismiss={handleDismissActiveCall}
+        />
+      )}
+
+      {/* ── Dialer Mode Switch Card ── */}
+      <div className="bg-white/90 backdrop-blur-md rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-2xl bg-amber-100/70 text-amber-900">
+              <Settings2 className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Dialer Usage Mode</h3>
+              <p className="text-xs text-slate-400">Choose preferred dialer for placing calls</p>
+            </div>
+          </div>
+          <div className="inline-flex p-1 bg-slate-100/80 rounded-2xl border border-slate-200/60 self-start sm:self-auto">
+            <button
+              onClick={() => handleDialerModeChange('internal')}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+                dialerMode === 'internal'
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/60'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Internal CRM Dialer
+            </button>
+            <button
+              onClick={() => handleDialerModeChange('system')}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+                dialerMode === 'system'
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/60'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              System Phone App
+            </button>
+          </div>
+        </div>
+
+        {dialerMode === 'internal' ? (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-amber-50/60 border border-amber-100/80 rounded-2xl p-4">
+            <div className="space-y-1">
+              <p className="font-bold text-amber-900 flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-amber-700" />
+                CRM In-App Dialer Mode Active
+              </p>
+              <p className="text-amber-800/80 text-[11px] leading-relaxed">
+                Places calls directly inside CRM with live call duration and dual-channel call recording. Requires Default Dialer role.
+              </p>
+            </div>
+            {!monitorStatus.isDefaultDialer && isAndroid && (
+              <button
+                onClick={() => window.AndroidCRM?.requestDefaultDialer?.()}
+                className="shrink-0 px-3.5 py-2 text-xs font-bold bg-amber-200 text-amber-900 rounded-xl hover:bg-amber-300 transition-colors shadow-sm"
+              >
+                Grant Default Dialer Role
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 text-xs bg-sky-50/60 border border-sky-100/80 rounded-2xl p-4">
+            <Smartphone className="h-5 w-5 text-sky-700 shrink-0" />
+            <div>
+              <p className="font-bold text-sky-900">System Phone App Mode Active</p>
+              <p className="text-sky-800/80 text-[11px] leading-relaxed">
+                Calls will open your phone's default phone app directly. Foreground Call Monitor will still capture call start & duration.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── Status Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -436,7 +582,7 @@ const CallMonitor = () => {
               </div>
             </div>
             <span className={`px-2.5 py-1 text-[10px] font-extrabold tracking-wider uppercase rounded-full ${monitorStatus.isDefaultDialer ? 'bg-sky-50 text-sky-700 border border-sky-200/60' : 'bg-amber-50 text-amber-700 border border-amber-200/60'}`}>
-              {monitorStatus.isDefaultDialer ? 'Granted' : 'Required'}
+              {monitorStatus.isDefaultDialer ? 'Granted' : 'Optional'}
             </span>
           </div>
           {!monitorStatus.isDefaultDialer ? (
@@ -445,7 +591,7 @@ const CallMonitor = () => {
               disabled={!isAndroid}
               className="w-full py-2.5 text-xs font-bold rounded-2xl bg-amber-50/70 text-amber-700 border border-amber-200/60 hover:bg-amber-100/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
             >
-              Request Role
+              Request Default Role
             </button>
           ) : (
             <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50/70 border border-emerald-100 rounded-2xl px-3 py-2">
@@ -537,12 +683,13 @@ const CallMonitor = () => {
             <Sparkles className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900 mb-1">Dual-Source Audio Recording</h3>
+            <h3 className="text-sm font-bold text-slate-900 mb-1">Dual Dialer Support & Audio Recording</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Calls are automatically recorded when the default dialer role is granted. The system seamlessly probes{' '}
+              Choose between <strong>CRM Default Dialer</strong> for in-app calls or <strong>System Phone App</strong> for standard phone dialing.
+              When using CRM Default Dialer, recording uses{' '}
               <code className="bg-amber-100/60 px-1.5 py-0.5 rounded-md text-amber-900 font-mono text-[11px]">VOICE_RECOGNITION</code> →{' '}
               <code className="bg-amber-100/60 px-1.5 py-0.5 rounded-md text-amber-900 font-mono text-[11px]">VOICE_COMMUNICATION</code> →{' '}
-              <code className="bg-amber-100/60 px-1.5 py-0.5 rounded-md text-amber-900 font-mono text-[11px]">MIC</code> sources, then falls back to OEM recorder detection (MIUI / Samsung / OnePlus) if required.
+              <code className="bg-amber-100/60 px-1.5 py-0.5 rounded-md text-amber-900 font-mono text-[11px]">MIC</code> audio fallback chain.
             </p>
           </div>
         </div>

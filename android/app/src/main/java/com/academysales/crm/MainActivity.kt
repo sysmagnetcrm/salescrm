@@ -320,18 +320,38 @@ class MainActivity : AppCompatActivity() {
         }
 
         @android.webkit.JavascriptInterface
+        fun setDialerMode(mode: String?) {
+            val cleanMode = if (mode?.lowercase() == "system") "system" else "internal"
+            getSharedPreferences("crm_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putString("dialer_mode", cleanMode)
+                .apply()
+        }
+
+        @android.webkit.JavascriptInterface
+        fun getDialerMode(): String {
+            return getSharedPreferences("crm_prefs", Context.MODE_PRIVATE)
+                .getString("dialer_mode", "internal") ?: "internal"
+        }
+
+        @android.webkit.JavascriptInterface
         fun startCrmCall(phoneNumber: String, leadId: String?, callId: String?) {
-            placeTelecomCall(phoneNumber, leadId, callId, null, null)
+            placeTelecomCall(phoneNumber, leadId, callId, null, null, null)
         }
 
         @android.webkit.JavascriptInterface
         fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?) {
-            placeTelecomCall(phoneNumber, leadId, callId, null, null)
+            placeTelecomCall(phoneNumber, leadId, callId, null, null, null)
         }
 
         @android.webkit.JavascriptInterface
         fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?, authToken: String?) {
-            placeTelecomCall(phoneNumber, leadId, callId, null, authToken)
+            placeTelecomCall(phoneNumber, leadId, callId, null, authToken, null)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?, leadName: String?, authToken: String?) {
+            placeTelecomCall(phoneNumber, leadId, callId, leadName, authToken, null)
         }
 
         @android.webkit.JavascriptInterface
@@ -357,12 +377,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         @android.webkit.JavascriptInterface
-        fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?, leadName: String?, authToken: String?) {
+        fun placeTelecomCall(phoneNumber: String, leadId: String?, callId: String?, leadName: String?, authToken: String?, customDialerMode: String?) {
             runOnUiThread {
-                try {
-                    val sanitized = phoneNumber.replace(Regex("[^0-9+]"), "")
-                    val uri = Uri.parse("tel:$sanitized")
+                val sanitized = phoneNumber.replace(Regex("[^0-9+]"), "")
+                val uri = Uri.parse("tel:$sanitized")
 
+                try {
                     if (!authToken.isNullOrEmpty()) {
                         getSharedPreferences("crm_prefs", Context.MODE_PRIVATE)
                             .edit()
@@ -371,9 +391,41 @@ class MainActivity : AppCompatActivity() {
                         com.academysales.crm.telecom.CrmInCallService.userAuthToken = authToken
                     }
 
+                    // 1. Permission Check: CALL_PHONE
+                    val hasCallPhone = androidx.core.content.ContextCompat.checkSelfPermission(
+                        this@MainActivity, android.Manifest.permission.CALL_PHONE
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                    if (!hasCallPhone) {
+                        android.widget.Toast.makeText(
+                            this@MainActivity,
+                            "⚠️ CALL_PHONE permission not granted. Please enable Call permissions in Settings.",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+
+                        val jsError = "javascript:if(window.onNativeCallStateChange){window.onNativeCallStateChange('$callId','failed',0);}" +
+                                      "window.dispatchEvent(new CustomEvent('crmCallError', {detail:{callId:'$callId',message:'CALL_PHONE permission missing.'}}));"
+                        webView?.evaluateJavascript(jsError, null)
+
+                        androidx.core.app.ActivityCompat.requestPermissions(
+                            this@MainActivity,
+                            arrayOf(
+                                android.Manifest.permission.CALL_PHONE,
+                                android.Manifest.permission.READ_CALL_LOG
+                            ),
+                            101
+                        )
+                        return@runOnUiThread
+                    }
+
+                    // 2. Determine effective dialer mode
+                    val savedMode = getSharedPreferences("crm_prefs", Context.MODE_PRIVATE).getString("dialer_mode", "internal") ?: "internal"
+                    val effectiveMode = if (!customDialerMode.isNullOrEmpty()) customDialerMode.lowercase() else savedMode
+                    val isHeld = isDefaultDialerHeld()
+
                     com.academysales.crm.telecom.CrmInCallService.resetSession(callId, leadId, sanitized, leadName, "outbound")
 
-                    // Launch Foreground Service to ensure NativeCallMonitor stays alive in background and watches CallLog
+                    // Always launch CallMonitorService foreground service for call log observation
                     val monitorIntent = Intent(this@MainActivity, com.academysales.crm.telecom.CallMonitorService::class.java).apply {
                         putExtra("callId", callId)
                         putExtra("leadId", leadId)
@@ -385,45 +437,40 @@ class MainActivity : AppCompatActivity() {
                         startService(monitorIntent)
                     }
 
-                    val hasCallPhone = androidx.core.content.ContextCompat.checkSelfPermission(
-                        this@MainActivity, android.Manifest.permission.CALL_PHONE
-                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    if (effectiveMode == "internal") {
+                        if (!isHeld) {
+                            android.widget.Toast.makeText(
+                                this@MainActivity,
+                                "⚠️ CRM is not set as Default Dialer. Requesting role & calling via System Phone App...",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                            requestDefaultDialer()
 
-                    val hasReadCallLog = androidx.core.content.ContextCompat.checkSelfPermission(
-                        this@MainActivity, android.Manifest.permission.READ_CALL_LOG
-                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-
-                    // Launch Native In-Call CRM Dialer Activity
-                    try {
-                        val callUiIntent = Intent(this@MainActivity, com.academysales.crm.telecom.CrmCallActivity::class.java).apply {
-                            putExtra("callId", callId)
-                            putExtra("leadId", leadId)
-                            putExtra("leadName", leadName)
-                            putExtra("phone", sanitized)
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            // Fallback to System Phone App placement
+                            val dialIntent = Intent(Intent.ACTION_CALL, uri).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            startActivity(dialIntent)
+                            return@runOnUiThread
                         }
-                        startActivity(callUiIntent)
-                    } catch (e: Exception) {
-                        Log.w("MainActivity", "Could not launch CrmCallActivity: ${e.message}")
-                    }
 
-                    if (hasCallPhone && hasReadCallLog) {
+                        // Internal CRM In-Call UI
+                        try {
+                            val callUiIntent = Intent(this@MainActivity, com.academysales.crm.telecom.CrmCallActivity::class.java).apply {
+                                putExtra("callId", callId)
+                                putExtra("leadId", leadId)
+                                putExtra("leadName", leadName)
+                                putExtra("phone", sanitized)
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            }
+                            startActivity(callUiIntent)
+                        } catch (e: Exception) {
+                            Log.w("MainActivity", "Could not launch CrmCallActivity: ${e.message}")
+                        }
+
                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                             val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
                             if (telecomManager != null) {
-                                val isHeld = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                                    val roleManager = getSystemService(Context.ROLE_SERVICE) as? android.app.role.RoleManager
-                                    roleManager?.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER) == true
-                                } else {
-                                    telecomManager.defaultDialerPackage == packageName
-                                }
-
-                                if (!isHeld) {
-                                    Log.e("MainActivity", "ROLE_DIALER is NOT held by $packageName. Refusing to place call via fallback.")
-                                    requestDefaultDialer()
-                                    return@runOnUiThread
-                                }
-
                                 val extras = Bundle()
                                 val accounts = telecomManager.callCapablePhoneAccounts
                                 val defaultAccount = telecomManager.getDefaultOutgoingPhoneAccount("tel")
@@ -432,32 +479,34 @@ class MainActivity : AppCompatActivity() {
                                     extras.putParcelable(android.telecom.TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, defaultAccount)
                                 }
                                 telecomManager.placeCall(uri, extras)
-                                Log.d("MainActivity", "Successfully placed call via TelecomManager.placeCall directly!")
-                            } else {
-                                Log.e("MainActivity", "TelecomManager unavailable!")
+                                Log.d("MainActivity", "Placed call via TelecomManager.placeCall directly.")
                             }
                         }
                     } else {
-                        androidx.core.app.ActivityCompat.requestPermissions(
+                        // System Phone App Mode
+                        android.widget.Toast.makeText(
                             this@MainActivity,
-                            arrayOf(
-                                android.Manifest.permission.CALL_PHONE,
-                                android.Manifest.permission.READ_CALL_LOG
-                            ),
-                            101
-                        )
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    try {
-                        val sanitized = phoneNumber.replace(Regex("[^0-9+]"), "")
-                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$sanitized")).apply {
+                            "📞 Calling via System Phone App...",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+
+                        val dialIntent = Intent(Intent.ACTION_CALL, uri).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK
                         }
-                        startActivity(intent)
-                    } catch (ex: Exception) {
-                        ex.printStackTrace()
+                        startActivity(dialIntent)
                     }
+
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    android.widget.Toast.makeText(
+                        this@MainActivity,
+                        "Call Failed: ${e.message}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+
+                    val jsError = "javascript:if(window.onNativeCallStateChange){window.onNativeCallStateChange('$callId','failed',0);}" +
+                                  "window.dispatchEvent(new CustomEvent('crmCallError', {detail:{callId:'$callId',message:'Call failed: ${e.message}'}}));"
+                    webView?.evaluateJavascript(jsError, null)
                 }
             }
         }

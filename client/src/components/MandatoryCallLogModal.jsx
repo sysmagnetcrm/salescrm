@@ -113,6 +113,16 @@ const MandatoryCallLogModal = () => {
       }
     };
 
+    const handleCallError = () => {
+      setIsOpen(false);
+      setPendingCall(null);
+      localStorage.removeItem('pendingCallLog');
+      const rawUser = localStorage.getItem('user');
+      const user = rawUser ? JSON.parse(rawUser) : null;
+      const userId = user?.id || user?._id || 'default';
+      localStorage.removeItem(`pendingCallLog_${userId}`);
+    };
+
     const handleFocusOrVisibility = () => {
       if (document.visibilityState === 'visible') {
         checkPendingCallLog();
@@ -120,11 +130,13 @@ const MandatoryCallLogModal = () => {
     };
 
     window.addEventListener('crmCallStarted', handleCallStarted);
+    window.addEventListener('crmCallError', handleCallError);
     window.addEventListener('focus', handleFocusOrVisibility);
     document.addEventListener('visibilitychange', handleFocusOrVisibility);
 
     return () => {
       window.removeEventListener('crmCallStarted', handleCallStarted);
+      window.removeEventListener('crmCallError', handleCallError);
       window.removeEventListener('focus', handleFocusOrVisibility);
       document.removeEventListener('visibilitychange', handleFocusOrVisibility);
     };
