@@ -71,46 +71,44 @@ const AdminDashboard = () => {
     staleTime: 60000
   });
 
-  // Local component: non-interactive chips matching AllLeads styles
-  const StatusChips = ({ counts }) => {
+  // ── Beautiful Status Summary Board ───────────────────────────────────────
+  const StatusSummaryBoard = ({ counts, label, period }) => {
     const items = [
-      { key: '', label: 'All', color: 'bg-gray-100 text-gray-800' },
-      { key: 'fresh', label: 'Fresh', color: 'bg-white border-2 border-gray-300' },
-      { key: 'follow-up', label: 'Follow-up', color: 'bg-orange-100 text-orange-800' },
-      { key: 'rnr', label: 'RNR', color: 'bg-purple-100 text-purple-800' },
-      { key: 'closed', label: 'Registered', color: 'bg-green-100 text-green-800' },
-      { key: 'dead', label: 'Dead', color: 'bg-red-100 text-red-800' },
-      { key: 'cancelled', label: 'Cancelled', color: 'bg-red-100 text-red-800' },
-      { key: 'rejected', label: 'Rejected', color: 'bg-red-100 text-red-800' }
+      { key: 'fresh',     label: 'Fresh',      color: 'bg-slate-500',    light: 'bg-slate-50',   text: 'text-slate-700'  },
+      { key: 'follow-up', label: 'Follow-up',  color: 'bg-amber-500',    light: 'bg-amber-50',   text: 'text-amber-700'  },
+      { key: 'rnr',       label: 'RNR',        color: 'bg-violet-500',   light: 'bg-violet-50',  text: 'text-violet-700' },
+      { key: 'closed',    label: 'Registered', color: 'bg-emerald-500',  light: 'bg-emerald-50', text: 'text-emerald-700'},
+      { key: 'dead',      label: 'Dead',       color: 'bg-red-400',      light: 'bg-red-50',     text: 'text-red-700'    },
+      { key: 'cancelled', label: 'Cancelled',  color: 'bg-orange-400',   light: 'bg-orange-50',  text: 'text-orange-700' },
+      { key: 'rejected',  label: 'Rejected',   color: 'bg-rose-400',     light: 'bg-rose-50',    text: 'text-rose-700'   },
     ];
-
+    const total = counts?.all || 0;
     return (
-      <>
-        {/* Mobile/Tablet grid */}
-        <div className="grid grid-cols-4 gap-2 lg:hidden">
-          {items.map((tab) => (
-            <div
-              key={tab.key || 'all'}
-              className={`inline-flex items-center justify-center w-full h-7 px-2 py-0.5 text-[10px] rounded-full font-medium whitespace-nowrap ${tab.color}`}
-            >
-              {tab.label} ({counts?.[tab.key || 'all'] ?? 0})
-            </div>
-          ))}
+      <div className="flex flex-col">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</span>
+          <span className="text-sm font-black text-gray-900">{total.toLocaleString()} leads</span>
         </div>
-        {/* Desktop horizontal chips */}
-        <div className="hidden lg:flex flex-wrap gap-2 mt-1">
-          {items.map((tab) => (
-            <div
-              key={`lg-${tab.key || 'all'}`}
-              className={`inline-flex items-center justify-center h-8 px-3 rounded-full text-sm font-medium whitespace-nowrap shadow-sm border ${tab.color}`}
-            >
-              {tab.label} ({counts?.[tab.key || 'all'] ?? 0})
-            </div>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+          {items.map(item => {
+            const val = counts?.[item.key] ?? 0;
+            const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+            return (
+              <div key={item.key} className={`${item.light} rounded-xl p-3 border border-white shadow-sm`}>
+                <div className={`text-[10px] font-bold uppercase tracking-wider ${item.text} mb-1`}>{item.label}</div>
+                <div className="text-xl font-black text-gray-900 tabular-nums">{val.toLocaleString()}</div>
+                <div className="mt-1.5 h-1.5 bg-white rounded-full overflow-hidden">
+                  <div className={`h-full ${item.color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                </div>
+                <div className={`text-[10px] font-semibold mt-1 ${item.text}`}>{pct}%</div>
+              </div>
+            );
+          })}
         </div>
-      </>
+      </div>
     );
   };
+
 
   const { overview, leadsByStatus, topPerformers } = dashboardData || {};
 
@@ -183,20 +181,17 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Status summary boards */}
+      {/* Status Summary Boards — Daily / Weekly / Monthly */}
       <div className="space-y-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Daily Status Summary</h3>
-          <StatusChips counts={dailyCounts} />
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Weekly Status Summary</h3>
-          <StatusChips counts={weeklyCounts} />
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Monthly Status Summary</h3>
-          <StatusChips counts={monthlyCounts} />
-        </div>
+        {[
+          { label: 'Daily Activity', period: 'daily', counts: dailyCounts, icon: '📅', grad: 'from-blue-50 to-indigo-50', border: 'border-blue-100' },
+          { label: 'Weekly Activity', period: 'weekly', counts: weeklyCounts, icon: '📊', grad: 'from-violet-50 to-purple-50', border: 'border-violet-100' },
+          { label: 'Monthly Activity', period: 'monthly', counts: monthlyCounts, icon: '📈', grad: 'from-emerald-50 to-teal-50', border: 'border-emerald-100' }
+        ].map(({ label, period, counts, icon, grad, border }) => (
+          <div key={period} className={`bg-gradient-to-r ${grad} rounded-2xl border ${border} p-5 shadow-sm`}>
+            <StatusSummaryBoard counts={counts} label={`${icon} ${label}`} period={period} />
+          </div>
+        ))}
       </div>
 
       {/* Charts Section */}
