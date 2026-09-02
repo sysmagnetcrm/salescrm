@@ -1,6 +1,7 @@
 package com.academysales.crm.telecom
 
 import android.content.Intent
+import android.media.AudioManager
 import android.net.Uri
 import android.telecom.Call
 import android.telecom.CallAudioState
@@ -192,6 +193,18 @@ class CrmInCallService : InCallService() {
                     logNativeEvent("CALL_STATE_ACTIVE", callId, currentLeadId, currentPhoneNumber, "State: ACTIVE")
                     sendBackendStateUpdate(callId, "connected", mapOf("connectedAt" to nowIso))
                     CrmCallEventBridge.emitCallEvent("CALL_ACTIVE", callId, currentLeadId, currentLeadName, currentPhoneNumber, "CONNECTED", mapOf("connectedAt" to nowIso))
+
+                    // ── Auto-start CRM audio recorder ──
+                    // Force speakerphone so remote audio reaches the mic (dual-channel capture)
+                    try {
+                        val am = applicationContext.getSystemService(AUDIO_SERVICE) as? AudioManager
+                        am?.isSpeakerphoneOn = true
+                        am?.mode = AudioManager.MODE_IN_CALL
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not enable speakerphone for recording: ${e.message}")
+                    }
+                    val started = CrmAudioRecorder.startRecording(applicationContext, callId)
+                    logNativeEvent("RECORDING_STARTED", callId, currentLeadId, currentPhoneNumber, "CrmAudioRecorder started=$started")
                 }
             }
             Call.STATE_DISCONNECTING -> {
@@ -271,20 +284,37 @@ class CrmInCallService : InCallService() {
         )
         sendBackendStateUpdate(callId, finalStatus, payload)
 
-        // 3. Trigger OEM Recording Reconciliation Asynchronously
-        val phoneToResolve = currentPhoneNumber ?: ""
-        if (callId.isNotEmpty() && phoneToResolve.isNotEmpty()) {
-            val uploadUrl = "$serverBaseUrl/api/calls/$callId/upload-audio"
-            OemRecordingResolver.resolveAndUploadRecording(
-                context = applicationContext,
-                callLogId = callId,
-                targetPhoneNumber = phoneToResolve,
-                callDirection = currentDirection,
-                talkDurationSeconds = talkSecs,
-                endedAtMillis = endedAtMillis,
-                serverUploadUrl = uploadUrl,
-                authToken = userAuthToken
-            )
+        // 3. Stop CRM in-app recorder and upload immediately (primary path)
+        val uploadUrl = "$serverBaseUrl/api/calls/$callId/upload-audio"
+        val appRecordingFile = CrmAudioRecorder.stopRecording()
+        if (appRecordingFile != null && appRecordingFile.exists() && appRecordingFile.length() > 0) {
+            logNativeEvent("RECORDING_UPLOAD", callId, currentLeadId, currentPhoneNumber, "Uploading in-app recording (${appRecordingFile.length()} bytes)")
+            CrmAudioRecorder.uploadRecordingFile(applicationContext, callId, appRecordingFile, uploadUrl, userAuthToken)
+        } else {
+            logNativeEvent("RECORDING_FALLBACK", callId, currentLeadId, currentPhoneNumber, "In-app recording empty — falling back to OEM resolver")
+            // 4. Fallback: OEM Recording Reconciliation (Xiaomi MIUI / Samsung / OnePlus etc.)
+            val phoneToResolve = currentPhoneNumber ?: ""
+            if (phoneToResolve.isNotEmpty()) {
+                OemRecordingResolver.resolveAndUploadRecording(
+                    context = applicationContext,
+                    callLogId = callId,
+                    targetPhoneNumber = phoneToResolve,
+                    callDirection = currentDirection,
+                    talkDurationSeconds = talkSecs,
+                    endedAtMillis = endedAtMillis,
+                    serverUploadUrl = uploadUrl,
+                    authToken = userAuthToken
+                )
+            }
+        }
+
+        // Restore audio routing to normal after call
+        try {
+            val am = applicationContext.getSystemService(AUDIO_SERVICE) as? AudioManager
+            am?.isSpeakerphoneOn = false
+            am?.mode = AudioManager.MODE_NORMAL
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not restore audio mode: ${e.message}")
         }
     }
 

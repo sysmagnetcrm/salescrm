@@ -3,7 +3,11 @@ import { format } from 'date-fns';
 import { leadAPI, settingsAPI, startCrmCall } from '../../services/api';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { Phone, MessageCircle, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Clock } from 'lucide-react';
+import { 
+  Phone, MessageCircle, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Clock,
+  UserPlus, Sparkles, TrendingUp, Wallet, RotateCcw, ChevronLeft, ChevronRight,
+  Calendar, Package, X, Plus, Layers
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext.jsx';
 import LeadPaymentSection from '../../components/LeadPaymentSection';
@@ -244,7 +248,7 @@ const MyLeadsList = () => {
       const response = await leadAPI.getLead(lead.id);
       const leadData = response.data.data;
       setSelectedLead(leadData);
-      setEditData({ country: leadData.country || 'India', product: leadData.product || '' });
+      setEditData({ product: leadData.product || '' });
       setIsEditing(false);
       setShowModal(true);
     } catch (error) {
@@ -255,7 +259,6 @@ const MyLeadsList = () => {
   const handleSaveEdit = async () => {
     try {
       const payload = {
-        country: editData.country,
         product: editData.product
       };
       const response = await leadAPI.updateLead(selectedLead.id, payload);
@@ -272,9 +275,17 @@ const MyLeadsList = () => {
   };
 
   const handleCancelEdit = () => {
-    setEditData({ country: selectedLead.country || '', product: selectedLead.product || '' });
+    setEditData({ product: selectedLead.product || '' });
     setIsEditing(false);
   };
+
+  // Pagination & Filter Metrics
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, debouncedSearch]);
 
   const statusCounts = { all: leads.length };
   statuses.forEach(s => { statusCounts[s.value] = 0; });
@@ -283,6 +294,20 @@ const MyLeadsList = () => {
       statusCounts[l.status] = (statusCounts[l.status] || 0) + 1;
     }
   });
+
+  const totalFilteredLeads = sortedLeads.length;
+  const totalPages = Math.ceil(totalFilteredLeads / pageSize) || 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedLeads = sortedLeads.slice(startIndex, startIndex + pageSize);
+
+  const totalLeadsCount = leads.length;
+  const freshLeadsCount = statusCounts['fresh'] || 0;
+  const followUpCount = statusCounts['follow-up'] || 0;
+
+  const totalAdvanceSum = sortedLeads.reduce((acc, lead) => {
+    const val = lead.value !== undefined && lead.value !== null ? parseFloat(lead.value) : 0;
+    return acc + (isNaN(val) ? 0 : val);
+  }, 0);
 
   const getStatusColor = (statusValue) => {
     const status = statuses.find(s => s.value === statusValue);
@@ -355,44 +380,122 @@ const MyLeadsList = () => {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">My Leads</h1>
-        {/* Mobile ADD LEAD pill */}
-        <div className="sm:hidden mt-2 flex justify-end">
-          <button
-            onClick={() => setShowCreate(true)}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold uppercase tracking-wider text-xs px-4 py-2 rounded-full shadow"
-          >
-            ADD LEAD
-          </button>
-        </div>
-      </div>
+      {/* Redesigned Hero Header Card */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-5 md:p-8 shadow-2xl border border-indigo-500/20">
+        {/* Background Ambient Glowing Orbs */}
+        <div className="absolute -right-16 -top-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -left-16 -bottom-16 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Filters */}
-      <div className="card !overflow-visible">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              {loading ? (
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                  <div className="animate-spin h-5 w-5 border-2 border-gray-300 border-t-gray-500 rounded-full"></div>
-                </div>
-              ) : (
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              )}
-              <input
-                type="text"
-                placeholder="Search leads..."
-                className="input-field pl-10"
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-semibold backdrop-blur-md">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+              <span>Sales Workspace</span>
+            </div>
+            <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight text-white flex flex-wrap items-center gap-3">
+              My Leads Pipeline
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                {totalLeadsCount} Total Active
+              </span>
+            </h1>
+            <p className="text-xs md:text-sm text-slate-300 max-w-xl">
+              Track, organize, and convert your assigned leads in real-time. Execute instant calls and log lead notes.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 self-start md:self-auto">
+            <button
+              onClick={() => setShowCreate(true)}
+              className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs md:text-sm px-5 py-3 rounded-2xl shadow-lg shadow-emerald-500/25 flex items-center gap-2 transition-all transform hover:scale-[1.02] active:scale-95 border border-emerald-400/30"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>ADD NEW LEAD</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Live Metrics Quick Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800/80">
+          <div className="bg-slate-800/50 backdrop-blur-md rounded-2xl p-3.5 border border-slate-700/50 flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium">Total Pipeline</p>
+              <p className="text-base font-bold text-white">{totalLeadsCount}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="bg-slate-800/50 backdrop-blur-md rounded-2xl p-3.5 border border-slate-700/50 flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium">Fresh Leads</p>
+              <p className="text-base font-bold text-sky-300">{freshLeadsCount}</p>
+            </div>
+          </div>
+
+          <div className="bg-slate-800/50 backdrop-blur-md rounded-2xl p-3.5 border border-slate-700/50 flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              <Clock className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium">Follow-ups Due</p>
+              <p className="text-base font-bold text-amber-300">{followUpCount}</p>
+            </div>
+          </div>
+
+          <div className="bg-slate-800/50 backdrop-blur-md rounded-2xl p-3.5 border border-slate-700/50 flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <Wallet className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium">Pipeline Advances</p>
+              <p className="text-base font-bold text-emerald-400 font-mono">
+                ₹{totalAdvanceSum.toLocaleString('en-IN')}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Redesigned Search & Filter Control Bar */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-sm space-y-3">
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+          {/* Search Input */}
+          <div className="flex-1 relative">
+            {loading ? (
+              <div className="absolute left-3.5 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+              </div>
+            ) : (
+              <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            )}
+            <input
+              type="text"
+              placeholder="Search by lead name, phone, email..."
+              className="w-full pl-10 pr-9 py-2.5 text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-gray-400 font-medium"
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            />
+            {filters.search && (
+              <button
+                onClick={() => setFilters({ ...filters, search: '' })}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Product Filter */}
+          <div className="w-full lg:w-56 relative">
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
+              <Package className="w-4 h-4" />
+            </div>
             <select
-              className="input-field w-full"
+              className="w-full pl-9 pr-8 py-2.5 text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium text-gray-700 cursor-pointer"
               value={filters.product}
               onChange={(e) => setFilters({ ...filters, product: e.target.value })}
             >
@@ -403,52 +506,75 @@ const MyLeadsList = () => {
                 </option>
               ))}
             </select>
-            <div className="w-full col-span-2 md:col-span-1">
-              <DatePicker
-                selectsRange={true}
-                startDate={startDate}
-                endDate={endDate}
-                onChange={(update) => {
-                  setDateRange(update);
-                  if (update[0] && update[1]) {
-                    setFilters({ ...filters, startDate: update[0].toISOString(), endDate: update[1].toISOString() });
-                  } else if (!update[0]) {
-                    setFilters({ ...filters, startDate: null, endDate: null });
-                  }
-                }}
-                isClearable={true}
-                placeholderText="Select Date Range"
-                className="input-field w-full"
-                wrapperClassName="w-full"
-                popperClassName="!z-50"
-                popperProps={{ strategy: 'fixed' }}
-              />
-            </div>
           </div>
+
+          {/* Date Picker */}
+          <div className="w-full lg:w-64 relative">
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none z-10">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <DatePicker
+              selectsRange={true}
+              startDate={startDate}
+              endDate={endDate}
+              onChange={(update) => {
+                setDateRange(update);
+                if (update[0] && update[1]) {
+                  setFilters({ ...filters, startDate: update[0].toISOString(), endDate: update[1].toISOString() });
+                } else if (!update[0]) {
+                  setFilters({ ...filters, startDate: null, endDate: null });
+                }
+              }}
+              isClearable={true}
+              placeholderText="Select Date Range"
+              className="w-full pl-9 pr-3 py-2.5 text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium text-gray-700 cursor-pointer"
+              wrapperClassName="w-full"
+              popperClassName="!z-50"
+              popperProps={{ strategy: 'fixed' }}
+            />
+          </div>
+
+          {/* Reset Filters Button */}
+          {(filters.search || filters.product || filters.status || startDate || endDate) && (
+            <button
+              onClick={() => {
+                setFilters({ status: '', search: '', country: '', product: '', startDate: null, endDate: null });
+                setDateRange([null, null]);
+              }}
+              className="px-3.5 py-2.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer"
+              title="Reset all filters"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Horizontal Scrollable Status Filter Bar */}
-      <div className="sticky top-14 z-20 bg-gray-50 pt-2 pb-2 w-full max-w-full overflow-x-hidden mb-2 border-b border-gray-200/60 md:static md:bg-transparent md:border-0 md:p-0 md:mb-4">
-        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full py-0.5 no-scrollbar">
-          {allTabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setFilters({ ...filters, status: tab.key })}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full font-bold transition-all text-xs whitespace-nowrap border shrink-0 ${
-                filters.status === tab.key
-                  ? 'border-primary-600 bg-primary-600 text-white shadow-sm'
-                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                filters.status === tab.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-              }`}>
-                {statusCounts[tab.key || 'all'] || 0}
-              </span>
-            </button>
-          ))}
+      <div className="sticky top-14 z-20 bg-gray-50/95 backdrop-blur-md py-2 w-full max-w-full overflow-x-hidden border-b border-gray-200/80 md:static md:bg-transparent md:border-0 md:p-0">
+        <div className="flex items-center gap-2 overflow-x-auto max-w-full py-1 no-scrollbar">
+          {allTabs.map((tab) => {
+            const isActive = filters.status === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setFilters({ ...filters, status: tab.key })}
+                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl font-bold transition-all text-xs whitespace-nowrap border shrink-0 cursor-pointer ${
+                  isActive
+                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-500/20 scale-[1.02]'
+                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-300'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {statusCounts[tab.key || 'all'] || 0}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -488,15 +614,6 @@ const MyLeadsList = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                       <th
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleSort('country')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Country
-                          {getSortIcon('country')}
-                        </div>
-                      </th>
-                      <th
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50"
                         onClick={() => handleSort('product')}
                       >
                         <div className="flex items-center gap-2">
@@ -526,7 +643,7 @@ const MyLeadsList = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white">
-                    {sortedLeads.map((lead) => {
+                    {paginatedLeads.map((lead) => {
                       const styles = getRowStyles(lead.status);
                       return (
                         <tr
@@ -542,7 +659,6 @@ const MyLeadsList = () => {
                             {lead.email && <div className="text-sm text-gray-500">{lead.email}</div>}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{ensureE164(lead.phone, lead.country)}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{lead.country}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lead.product || '-'}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(lead.status)}`}>
@@ -591,7 +707,7 @@ const MyLeadsList = () => {
             </div>
 
             <div className="md:hidden space-y-2.5">
-              {sortedLeads.map((lead) => {
+              {paginatedLeads.map((lead) => {
                 const styles = getRowStyles(lead.status);
                 return (
                   <div
@@ -640,6 +756,68 @@ const MyLeadsList = () => {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Redesigned Bottom Toolbar & Pagination Section */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 mt-4">
+              {/* Left: Summary & Stats */}
+              <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 w-full md:w-auto justify-between md:justify-start">
+                <span>
+                  Showing <strong className="text-gray-900">{totalFilteredLeads > 0 ? startIndex + 1 : 0}</strong> to{' '}
+                  <strong className="text-gray-900">{Math.min(startIndex + pageSize, totalFilteredLeads)}</strong> of{' '}
+                  <strong className="text-gray-900">{totalFilteredLeads}</strong> leads
+                </span>
+                {totalAdvanceSum > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+                    <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>View Advance Total: ₹{totalAdvanceSum.toLocaleString('en-IN')}</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Right: Pagination Controls */}
+              <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 font-medium">Per page:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="text-xs font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value={15}>15</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    title="Previous Page"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <span className="text-xs font-bold text-gray-800 px-2">
+                    Page {currentPage} of {totalPages}
+                  </span>
+
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                    disabled={currentPage >= totalPages}
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    title="Next Page"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
           </>
         ) : (
@@ -949,7 +1127,7 @@ const MyLeadsList = () => {
                       onClick={() => setIsEditing(true)}
                       className="flex-1 btn-secondary"
                     >
-                      Edit Country/Product
+                      Edit
                     </button>
                     <button
                       onClick={() => setShowModal(false)}
