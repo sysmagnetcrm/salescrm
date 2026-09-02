@@ -59,12 +59,12 @@ const DeviceFleetPage = () => {
 
   const getStatusBadge = (status) => {
     if (status === 'HEALTHY') {
-      return <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">● HEALTHY</span>;
+      return <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">HEALTHY</span>;
     }
     if (status === 'ACTION_REQUIRED') {
-      return <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">⚠ ACTION REQUIRED</span>;
+      return <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">ACTION REQUIRED</span>;
     }
-    return <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-red-100 text-red-800 border border-red-300">✕ OFFLINE</span>;
+    return <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-red-100 text-red-800 border border-red-300">OFFLINE</span>;
   };
 
   return (

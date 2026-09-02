@@ -40,13 +40,13 @@ const statusColor = {
 };
 
 const DISPOSITIONS = [
-  { value: 'interested', label: '✨ Interested' },
-  { value: 'callback', label: '📞 Callback Requested' },
-  { value: 'not_interested', label: '⚪ Not Interested' },
-  { value: 'wrong_number', label: '🚫 Wrong Number' },
-  { value: 'busy', label: '⏳ Busy – Try Later' },
-  { value: 'converted', label: '🏆 Converted' },
-  { value: 'follow_up', label: '🔄 Follow Up' },
+  { value: 'interested', label: 'Interested' },
+  { value: 'callback', label: 'Callback Requested' },
+  { value: 'not_interested', label: 'Not Interested' },
+  { value: 'wrong_number', label: 'Wrong Number' },
+  { value: 'busy', label: 'Busy - Try Later' },
+  { value: 'converted', label: 'Converted' },
+  { value: 'follow_up', label: 'Follow Up' },
 ];
 
 // ─── Post-Call Annotation Modal ────────────────────────────────────────────────
@@ -317,7 +317,7 @@ const CallMonitor = () => {
 
     const handleCrmCallError = (e) => {
       const msg = e?.detail?.message || 'Call failed. Please verify phone permissions.';
-      toast.error(`⚠️ ${msg}`, { duration: 5000 });
+      toast.error(msg, { duration: 5000 });
       setActiveCall(null);
       localStorage.removeItem('pendingCallLog');
     };

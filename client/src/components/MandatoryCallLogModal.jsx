@@ -145,7 +145,7 @@ const MandatoryCallLogModal = () => {
   // Handle Cancel Button Click (STRICT ENFORCEMENT: Warning message shown, DOES NOT CLOSE)
   const handleCancelClick = () => {
     setShowWarning(true);
-    toast.error('⚠️ Action Required: You must update the status and save the call log! Or contact your Team Leader (TL).', {
+    toast.error('Action Required: You must update the status and save the call log! Or contact your Team Leader (TL).', {
       duration: 5000,
       id: 'mandatory-call-warning'
     });
@@ -278,7 +278,7 @@ const MandatoryCallLogModal = () => {
               <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div className="text-xs space-y-1">
                 <h4 className="font-black text-amber-950 flex items-center gap-1">
-                  ⚠️ Status Update Required!
+                  Status Update Required!
                 </h4>
                 <p className="leading-relaxed font-medium">
                   This window cannot be closed without updating the lead status and saving the call log.

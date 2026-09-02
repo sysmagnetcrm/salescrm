@@ -161,7 +161,7 @@ const LeadPaymentSection = ({ lead, onPaymentRecorded }) => {
           <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
             isEligible ? 'bg-purple-100 text-purple-800 border border-purple-300' : 'bg-slate-100 text-slate-600 border border-slate-300'
           }`}>
-            {isEligible ? '★ ELIGIBLE (≥₹9K)' : 'PENDING'}
+            {isEligible ? 'ELIGIBLE (≥₹9K)' : 'PENDING'}
           </span>
         </div>
       </div>

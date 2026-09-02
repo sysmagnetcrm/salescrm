@@ -182,12 +182,12 @@ const AdminDashboard = () => {
       {/* Status Summary Boards — Daily / Weekly / Monthly */}
       <div className="space-y-5">
         {[
-          { label: 'Daily Activity', period: 'daily', counts: dailyCounts, icon: '📅', grad: 'from-amber-50/70 via-orange-50/40 to-slate-50', border: 'border-amber-100/60' },
-          { label: 'Weekly Activity', period: 'weekly', counts: weeklyCounts, icon: '📊', grad: 'from-purple-50/70 via-indigo-50/40 to-slate-50', border: 'border-purple-100/60' },
-          { label: 'Monthly Activity', period: 'monthly', counts: monthlyCounts, icon: '📈', grad: 'from-emerald-50/70 via-teal-50/40 to-slate-50', border: 'border-emerald-100/60' }
-        ].map(({ label, period, counts, icon, grad, border }) => (
+          { label: 'Daily Activity', period: 'daily', counts: dailyCounts, grad: 'from-amber-50/70 via-orange-50/40 to-slate-50', border: 'border-amber-100/60' },
+          { label: 'Weekly Activity', period: 'weekly', counts: weeklyCounts, grad: 'from-purple-50/70 via-indigo-50/40 to-slate-50', border: 'border-purple-100/60' },
+          { label: 'Monthly Activity', period: 'monthly', counts: monthlyCounts, grad: 'from-emerald-50/70 via-teal-50/40 to-slate-50', border: 'border-emerald-100/60' }
+        ].map(({ label, period, counts, grad, border }) => (
           <div key={period} className={`bg-gradient-to-r ${grad} rounded-3xl border ${border} p-6 shadow-sm backdrop-blur-md`}>
-            <StatusSummaryBoard counts={counts} label={`${icon} ${label}`} period={period} />
+            <StatusSummaryBoard counts={counts} label={label} period={period} />
           </div>
         ))}
       </div>

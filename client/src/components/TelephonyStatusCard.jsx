@@ -54,7 +54,7 @@ const TelephonyStatusCard = () => {
       >
         <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
         <span>CRM CALL SYSTEM</span>
-        <span className="font-extrabold text-[11px] text-amber-800">⚠ ACTION REQUIRED</span>
+        <span className="font-extrabold text-[11px] text-amber-800">ACTION REQUIRED</span>
       </button>
     );
   }
@@ -67,7 +67,7 @@ const TelephonyStatusCard = () => {
       >
         <XCircle className="h-3.5 w-3.5 text-red-700" />
         <span>CRM CALL SYSTEM</span>
-        <span className="font-extrabold text-[11px] text-red-800">✕ RECORDING UNAVAILABLE</span>
+        <span className="font-extrabold text-[11px] text-red-800">RECORDING UNAVAILABLE</span>
       </button>
     );
   }

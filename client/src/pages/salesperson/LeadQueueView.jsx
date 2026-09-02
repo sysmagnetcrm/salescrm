@@ -509,7 +509,7 @@ const LeadQueueView = () => {
             <CheckCircle className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-gray-900">✓ Queue Complete</h3>
+            <h3 className="text-base font-bold text-gray-900">Queue Complete</h3>
             <p className="text-xs text-gray-500 mt-1">All eligible leads in the <strong>{activeBucket}</strong> queue have been processed.</p>
           </div>
           <button
@@ -608,7 +608,7 @@ const LeadQueueView = () => {
                     className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-black text-sm tracking-wide transition-all shadow hover:shadow-md active:scale-98 flex items-center justify-center gap-2"
                   >
                     <Phone className="h-4.5 w-4.5" />
-                    <span>☎ CALL NOW</span>
+                    <span>CALL NOW</span>
                   </button>
 
                   {/* POST-CALL SUMMARY CARD (WHEN LAST CALL COMPLETED) */}
@@ -626,7 +626,7 @@ const LeadQueueView = () => {
                           className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors flex items-center gap-1 text-[11px] shadow-sm disabled:opacity-50"
                         >
                           <Zap className="h-3 w-3" />
-                          <span>{aiAnalyzing ? 'Analyzing...' : '⚡ AI ANALYZE CALL'}</span>
+                          <span>{aiAnalyzing ? 'Analyzing...' : 'AI ANALYZE CALL'}</span>
                         </button>
                       </div>
 

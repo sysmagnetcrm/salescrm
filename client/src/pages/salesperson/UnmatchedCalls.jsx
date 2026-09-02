@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callAPI, leadAPI } from '../../services/api';
-import { PhoneCall, AlertTriangle, Link2, UserPlus, Clock, Search } from 'lucide-react';
+import { PhoneCall, AlertTriangle, Link2, UserPlus, Clock, Search, X, CheckCircle2, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -113,7 +113,10 @@ const UnmatchedCalls = () => {
                 {unmatchedCalls.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
-                      ✅ No unmatched or ambiguous calls found! All calls matched to CRM leads.
+                      <div className="flex items-center justify-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                        No unmatched or ambiguous calls found! All calls matched to CRM leads.
+                      </div>
                     </td>
                   </tr>
                 )}
@@ -132,7 +135,7 @@ const UnmatchedCalls = () => {
                 <h3 className="text-lg font-bold text-gray-900">Associate Call to Lead</h3>
                 <p className="text-xs text-gray-500">Phone: {selectedCall.phoneNumber}</p>
               </div>
-              <button onClick={() => setSelectedCall(null)} className="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+              <button onClick={() => setSelectedCall(null)} className="text-gray-400 hover:text-gray-600 font-bold p-1"><X className="h-5 w-5" /></button>
             </div>
 
             <div className="space-y-3">
@@ -158,7 +161,7 @@ const UnmatchedCalls = () => {
                       <div className="font-semibold">{lead.name}</div>
                       <div className="text-[10px] text-gray-400">{lead.phone}</div>
                     </div>
-                    {selectedLeadId === lead.id && <span className="text-primary-600 font-bold">✓ Selected</span>}
+                    {selectedLeadId === lead.id && <span className="text-primary-600 font-bold flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Selected</span>}
                   </div>
                 ))}
                 {filteredLeads.length === 0 && (

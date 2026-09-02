@@ -171,7 +171,7 @@ const LeadCard = ({ lead, onClick }) => {
                 </span>
                 {(lead.admissionFeeStatus === 'cleared' || (adv >= 1000) || (lead.totalClearedPayment >= 1000)) && (
                   <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
-                    ✓ Admission Paid
+                    Admission Paid
                   </span>
                 )}
               </div>

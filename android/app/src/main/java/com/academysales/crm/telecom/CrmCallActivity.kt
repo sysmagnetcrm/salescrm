@@ -86,7 +86,7 @@ class CrmCallActivity : AppCompatActivity() {
 
         // Live Audio & Telemetry Active Badge
         tvRecStatus = TextView(this).apply {
-            text = "🔴 CRM DIALER ACTIVE • REAL-TIME TELEMETRY"
+            text = "CRM DIALER ACTIVE • REAL-TIME TELEMETRY"
             textSize = 10f
             setTextColor(0xFF38BDF8.toInt()) // Sky Blue
             gravity = Gravity.CENTER
@@ -152,27 +152,27 @@ class CrmCallActivity : AppCompatActivity() {
         }
 
         btnMute = Button(this).apply {
-            text = "MUTE 🎙️"
+            text = "MUTE"
             textSize = 13f
             setTextColor(0xFFF8FAFC.toInt())
             setBackgroundColor(0xFF334155.toInt())
             setOnClickListener {
                 isMuted = !isMuted
                 audioManager?.isMicrophoneMute = isMuted
-                text = if (isMuted) "MUTED 🔇" else "MUTE 🎙️"
+                text = if (isMuted) "MUTED" else "MUTE"
                 setBackgroundColor(if (isMuted) 0xFFDC2626.toInt() else 0xFF334155.toInt())
             }
         }
 
         btnSpeaker = Button(this).apply {
-            text = "SPEAKER 🔈"
+            text = "SPEAKER"
             textSize = 13f
             setTextColor(0xFFF8FAFC.toInt())
             setBackgroundColor(0xFF334155.toInt())
             setOnClickListener {
                 isSpeakerOn = !isSpeakerOn
                 audioManager?.isSpeakerphoneOn = isSpeakerOn
-                text = if (isSpeakerOn) "SPEAKER ON 🔊" else "SPEAKER 🔈"
+                text = if (isSpeakerOn) "SPEAKER ON" else "SPEAKER"
                 setBackgroundColor(if (isSpeakerOn) 0xFF0284C7.toInt() else 0xFF334155.toInt())
             }
         }
@@ -184,7 +184,7 @@ class CrmCallActivity : AppCompatActivity() {
         buttonContainer.addView(btnSpeaker, btnParam)
 
         btnEndCall = Button(this).apply {
-            text = "☎ END CALL"
+            text = "END CALL"
             textSize = 17f
             setTextColor(0xFFFFFFFF.toInt())
             setBackgroundColor(0xFFDC2626.toInt()) // Red #DC2626

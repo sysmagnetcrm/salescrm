@@ -405,7 +405,7 @@ class MainActivity : AppCompatActivity() {
                     if (!hasCallPhone) {
                         android.widget.Toast.makeText(
                             this@MainActivity,
-                            "⚠️ CALL_PHONE permission not granted. Please enable Call permissions in Settings.",
+                            "CALL_PHONE permission not granted. Please enable Call permissions in Settings.",
                             android.widget.Toast.LENGTH_LONG
                         ).show()
 
@@ -447,7 +447,7 @@ class MainActivity : AppCompatActivity() {
                         if (!isHeld) {
                             android.widget.Toast.makeText(
                                 this@MainActivity,
-                                "⚠️ CRM is not set as Default Dialer. Requesting role & calling via System Phone App...",
+                                "CRM is not set as Default Dialer. Requesting role & calling via System Phone App...",
                                 android.widget.Toast.LENGTH_LONG
                             ).show()
                             requestDefaultDialer()
@@ -492,7 +492,7 @@ class MainActivity : AppCompatActivity() {
                         // System Phone App Mode
                         android.widget.Toast.makeText(
                             this@MainActivity,
-                            "📞 Calling via System Phone App...",
+                            "Calling via System Phone App...",
                             android.widget.Toast.LENGTH_SHORT
                         ).show()
 
