@@ -121,8 +121,9 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         checkAndRequestAllFilesAccess()
-        // Safety net fallback: active CallLog check on app resume/foregrounding
+        // Safety net fallback: active CallLog check and device CallLog sync on app resume/foregrounding
         try {
+            com.academysales.crm.telecom.CallLogSyncService.syncRecentDeviceCallLogs(this)
             com.academysales.crm.telecom.CrmInCallService.currentCallLogId?.let { callId ->
                 com.academysales.crm.telecom.CrmInCallService.currentPhoneNumber?.let { phone ->
                     com.academysales.crm.telecom.NativeCallMonitor.startMonitoring(this, callId, null, phone)
@@ -237,6 +238,11 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 false
             }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun syncDeviceCallLogs() {
+            com.academysales.crm.telecom.CallLogSyncService.syncRecentDeviceCallLogs(this@MainActivity)
         }
 
         @android.webkit.JavascriptInterface

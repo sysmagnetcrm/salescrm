@@ -787,3 +787,101 @@ export const getFleetTelephonyStatus = async (req, res) => {
   }
 };
 
+// @desc    Sync and match device OS call logs with CRM leads
+// @route   POST /api/calls/sync-device-log
+// @access  Private
+export const syncDeviceLogs = async (req, res) => {
+  try {
+    const { logs } = req.body;
+    if (!Array.isArray(logs) || logs.length === 0) {
+      return res.status(200).json({ success: true, message: 'No call logs provided.', syncedCount: 0 });
+    }
+
+    let syncedCount = 0;
+    const userId = req.user.id;
+
+    for (const entry of logs) {
+      const { phoneNumber, durationSeconds = 0, callType = 'outbound', timestamp } = entry;
+      if (!phoneNumber) continue;
+
+      const sanitized = normalizePhoneDigits(phoneNumber);
+      if (!sanitized) continue;
+
+      // Find matching lead by phone digits
+      const matchingLeads = await Lead.findAll({
+        where: {
+          phone: { [Op.like]: `%${sanitized}` }
+        }
+      });
+
+      let leadId = null;
+      let matchingStatus = 'UNMATCHED';
+      let leadOwnerId = userId;
+
+      if (matchingLeads.length === 1) {
+        leadId = matchingLeads[0].id;
+        matchingStatus = 'MATCHED';
+        leadOwnerId = matchingLeads[0].assignedTo || userId;
+      } else if (matchingLeads.length > 1) {
+        leadId = matchingLeads[0].id;
+        matchingStatus = 'AMBIGUOUS';
+        leadOwnerId = matchingLeads[0].assignedTo || userId;
+      }
+
+      const callDate = timestamp ? new Date(Number(timestamp)) : new Date();
+      const status = Number(durationSeconds) > 0 ? 'completed' : 'no-answer';
+
+      // Deduplication check: same user within +/- 2 minutes
+      const timeWindowStart = new Date(callDate.getTime() - 120000);
+      const timeWindowEnd = new Date(callDate.getTime() + 120000);
+
+      const existingCall = await CallLog.findOne({
+        where: {
+          callerUserId: userId,
+          createdAt: { [Op.between]: [timeWindowStart, timeWindowEnd] }
+        }
+      });
+
+      if (!existingCall) {
+        await CallLog.create({
+          leadId,
+          callerUserId: userId,
+          leadOwnerId,
+          phoneNumber,
+          callDirection: callType,
+          callStatus: status,
+          durationSeconds: Number(durationSeconds) || 0,
+          lifecycleDurationSeconds: Number(durationSeconds) || 0,
+          matchingStatus,
+          syncStatus: 'synced',
+          startedAt: callDate,
+          endedAt: new Date(callDate.getTime() + (Number(durationSeconds) * 1000)),
+          notes: 'Synced from Phone Dialer CallLog'
+        });
+        syncedCount++;
+      } else if (existingCall && Number(durationSeconds) > 0 && existingCall.durationSeconds === 0) {
+        existingCall.durationSeconds = Number(durationSeconds);
+        existingCall.lifecycleDurationSeconds = Number(durationSeconds);
+        existingCall.callStatus = 'completed';
+        existingCall.syncStatus = 'synced';
+        if (leadId && !existingCall.leadId) {
+          existingCall.leadId = leadId;
+          existingCall.matchingStatus = matchingStatus;
+        }
+        await existingCall.save();
+        syncedCount++;
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully matched and synced ${syncedCount} phone call logs.`,
+      syncedCount
+    });
+  } catch (error) {
+    console.error('syncDeviceLogs Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+

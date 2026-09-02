@@ -132,7 +132,8 @@ export const callAPI = {
   getUnmatchedCalls: () => api.get('/calls/unmatched'),
   reconcileUnmatchedCall: (id, leadId) => api.post(`/calls/unmatched/${id}/reconcile`, { leadId }),
   getCallAnalytics: (timeframe) => api.get(`/calls/analytics?timeframe=${timeframe || 'today'}`),
-  getFleetStatus: () => api.get('/calls/fleet-status')
+  getFleetStatus: () => api.get('/calls/fleet-status'),
+  syncDeviceCallLogs: (logs) => api.post('/calls/sync-device-log', { logs })
 };
 
 // System Version API
