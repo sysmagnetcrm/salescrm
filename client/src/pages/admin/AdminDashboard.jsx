@@ -71,17 +71,17 @@ const AdminDashboard = () => {
     staleTime: 60000
   });
 
-  // ── Capsule Design Status Summary Board ───────────────────────────────────
+  // ── Capsule Design Status Summary Board (5% Opacity Backgrounds) ──────────
   const StatusSummaryBoard = ({ counts, label }) => {
     const items = [
-      { key: 'all',       label: 'All',        color: 'bg-slate-900 text-white border-slate-900', badge: 'bg-slate-800 text-slate-100' },
-      { key: 'fresh',     label: 'Fresh',      color: 'bg-white text-slate-800 border-slate-300/80', badge: 'bg-slate-100 text-slate-900' },
-      { key: 'follow-up', label: 'Follow-up',  color: 'bg-amber-100/80 text-amber-950 border-amber-300/80', badge: 'bg-amber-200/90 text-amber-950' },
-      { key: 'rnr',       label: 'RNR',        color: 'bg-purple-100/80 text-purple-950 border-purple-300/80', badge: 'bg-purple-200/90 text-purple-950' },
-      { key: 'closed',    label: 'Registered', color: 'bg-emerald-100/80 text-emerald-950 border-emerald-300/80', badge: 'bg-emerald-200/90 text-emerald-950' },
-      { key: 'dead',      label: 'Dead',       color: 'bg-rose-100/80 text-rose-950 border-rose-300/80', badge: 'bg-rose-200/90 text-rose-950' },
-      { key: 'cancelled', label: 'Cancelled',  color: 'bg-orange-100/80 text-orange-950 border-orange-300/80', badge: 'bg-orange-200/90 text-orange-950' },
-      { key: 'rejected',  label: 'Rejected',   color: 'bg-red-100/80 text-red-950 border-red-300/80', badge: 'bg-red-200/90 text-red-950' },
+      { key: 'all',       label: 'All',        color: 'bg-slate-900/5 text-slate-900 border-slate-900/20 hover:bg-slate-900/10', badge: 'bg-slate-900/10 text-slate-900' },
+      { key: 'fresh',     label: 'Fresh',      color: 'bg-slate-500/5 text-slate-800 border-slate-400/20 hover:bg-slate-500/10', badge: 'bg-slate-500/10 text-slate-900' },
+      { key: 'follow-up', label: 'Follow-up',  color: 'bg-amber-500/5 text-amber-950 border-amber-400/30 hover:bg-amber-500/10', badge: 'bg-amber-500/15 text-amber-950' },
+      { key: 'rnr',       label: 'RNR',        color: 'bg-purple-500/5 text-purple-950 border-purple-400/30 hover:bg-purple-500/10', badge: 'bg-purple-500/15 text-purple-950' },
+      { key: 'closed',    label: 'Registered', color: 'bg-emerald-500/5 text-emerald-950 border-emerald-400/30 hover:bg-emerald-500/10', badge: 'bg-emerald-500/15 text-emerald-950' },
+      { key: 'dead',      label: 'Dead',       color: 'bg-rose-500/5 text-rose-950 border-rose-400/30 hover:bg-rose-500/10', badge: 'bg-rose-500/15 text-rose-950' },
+      { key: 'cancelled', label: 'Cancelled',  color: 'bg-orange-500/5 text-orange-950 border-orange-400/30 hover:bg-orange-500/10', badge: 'bg-orange-500/15 text-orange-950' },
+      { key: 'rejected',  label: 'Rejected',   color: 'bg-red-500/5 text-red-950 border-red-400/30 hover:bg-red-500/10', badge: 'bg-red-500/15 text-red-950' },
     ];
     const total = counts?.all || 0;
     return (
