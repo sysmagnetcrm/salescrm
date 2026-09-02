@@ -71,36 +71,40 @@ const AdminDashboard = () => {
     staleTime: 60000
   });
 
-  // ── Beautiful Status Summary Board ───────────────────────────────────────
-  const StatusSummaryBoard = ({ counts, label, period }) => {
+  // ── Capsule Design Status Summary Board ───────────────────────────────────
+  const StatusSummaryBoard = ({ counts, label }) => {
     const items = [
-      { key: 'fresh',     label: 'Fresh',      color: 'bg-slate-500',    light: 'bg-slate-50',   text: 'text-slate-700'  },
-      { key: 'follow-up', label: 'Follow-up',  color: 'bg-amber-500',    light: 'bg-amber-50',   text: 'text-amber-700'  },
-      { key: 'rnr',       label: 'RNR',        color: 'bg-violet-500',   light: 'bg-violet-50',  text: 'text-violet-700' },
-      { key: 'closed',    label: 'Registered', color: 'bg-emerald-500',  light: 'bg-emerald-50', text: 'text-emerald-700'},
-      { key: 'dead',      label: 'Dead',       color: 'bg-red-400',      light: 'bg-red-50',     text: 'text-red-700'    },
-      { key: 'cancelled', label: 'Cancelled',  color: 'bg-orange-400',   light: 'bg-orange-50',  text: 'text-orange-700' },
-      { key: 'rejected',  label: 'Rejected',   color: 'bg-rose-400',     light: 'bg-rose-50',    text: 'text-rose-700'   },
+      { key: 'all',       label: 'All',        color: 'bg-slate-900 text-white border-slate-900', badge: 'bg-slate-800 text-slate-100' },
+      { key: 'fresh',     label: 'Fresh',      color: 'bg-white text-slate-800 border-slate-300/80', badge: 'bg-slate-100 text-slate-900' },
+      { key: 'follow-up', label: 'Follow-up',  color: 'bg-amber-100/80 text-amber-950 border-amber-300/80', badge: 'bg-amber-200/90 text-amber-950' },
+      { key: 'rnr',       label: 'RNR',        color: 'bg-purple-100/80 text-purple-950 border-purple-300/80', badge: 'bg-purple-200/90 text-purple-950' },
+      { key: 'closed',    label: 'Registered', color: 'bg-emerald-100/80 text-emerald-950 border-emerald-300/80', badge: 'bg-emerald-200/90 text-emerald-950' },
+      { key: 'dead',      label: 'Dead',       color: 'bg-rose-100/80 text-rose-950 border-rose-300/80', badge: 'bg-rose-200/90 text-rose-950' },
+      { key: 'cancelled', label: 'Cancelled',  color: 'bg-orange-100/80 text-orange-950 border-orange-300/80', badge: 'bg-orange-200/90 text-orange-950' },
+      { key: 'rejected',  label: 'Rejected',   color: 'bg-red-100/80 text-red-950 border-red-300/80', badge: 'bg-red-200/90 text-red-950' },
     ];
     const total = counts?.all || 0;
     return (
-      <div className="flex flex-col">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</span>
-          <span className="text-sm font-black text-gray-900">{total.toLocaleString()} leads</span>
+      <div className="flex flex-col space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{label}</h3>
+          <span className="text-xs font-black text-slate-800 bg-white/90 backdrop-blur-xs px-3 py-1 rounded-full border border-slate-200/80 shadow-2xs">
+            {total.toLocaleString()} leads
+          </span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+        {/* Capsule Pills Row */}
+        <div className="flex flex-wrap gap-2 items-center">
           {items.map(item => {
             const val = counts?.[item.key] ?? 0;
-            const pct = total > 0 ? Math.round((val / total) * 100) : 0;
             return (
-              <div key={item.key} className={`${item.light} rounded-xl p-3 border border-white shadow-sm`}>
-                <div className={`text-[10px] font-bold uppercase tracking-wider ${item.text} mb-1`}>{item.label}</div>
-                <div className="text-xl font-black text-gray-900 tabular-nums">{val.toLocaleString()}</div>
-                <div className="mt-1.5 h-1.5 bg-white rounded-full overflow-hidden">
-                  <div className={`h-full ${item.color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
-                </div>
-                <div className={`text-[10px] font-semibold mt-1 ${item.text}`}>{pct}%</div>
+              <div
+                key={item.key}
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 hover:scale-105 shadow-2xs ${item.color}`}
+              >
+                <span>{item.label}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-black tabular-nums ${item.badge}`}>
+                  {val.toLocaleString()}
+                </span>
               </div>
             );
           })}
