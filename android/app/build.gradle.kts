@@ -10,25 +10,38 @@ android {
     defaultConfig {
         applicationId = "com.academysales.crm"
         minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.2.0"
+        targetSdk = 35
+        versionCode = 5
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
+
         buildConfigField("String", "WEB_APP_URL", "\"https://salescrm-theta.vercel.app\"")
         buildConfigField("String", "API_BASE_URL", "\"https://salescrm-7z2o.onrender.com/api\"")
-        buildConfigField("String", "CLIENT_VERSION", "\"1.2.0\"")
+        buildConfigField("String", "CLIENT_VERSION", "\"1.5.0\"")
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("academysales_release.jks")
+            storePassword = "AcademySales@2025"
+            keyAlias = "academysales"
+            keyPassword = "AcademySales@2025"
+        }
     }
 
     buildTypes {
         debug {
             isMinifyEnabled = false
+            // Debug also signed with release key so Play Protect accepts sideloading
+            signingConfig = signingConfigs.getByName("release")
             buildConfigField("String", "WEB_APP_URL", "\"https://salescrm-theta.vercel.app\"")
             buildConfigField("String", "API_BASE_URL", "\"https://salescrm-7z2o.onrender.com/api\"")
         }
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "WEB_APP_URL", "\"https://salescrm-theta.vercel.app\"")
             buildConfigField("String", "API_BASE_URL", "\"https://salescrm-7z2o.onrender.com/api\"")

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration for Academy Sales CRM
+    - Only HTTPS traffic is allowed (no cleartext)
+    - Trust system CAs only (no user-installed CAs in release)
+    - appassets.androidplatform.net is the secure virtual domain used by WebViewAssetLoader
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Allow debug/dev builds to trust user-added CAs for testing with Charles Proxy etc. -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>
