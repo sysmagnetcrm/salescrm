@@ -3,14 +3,18 @@ package com.academysales.crm
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewAssetLoader
 
@@ -24,12 +28,33 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         activeMainActivityInstance = this
 
+        // Enforce fits system windows decor behavior
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+
+        // Configure light status bar icons (dark icons on light background)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
+        }
+
         // Secure AssetLoader to load offline Vite dist securely via virtual domain
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
 
+        val rootLayout = FrameLayout(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(Color.WHITE)
+        }
+
         webView = WebView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.allowFileAccess = true
@@ -39,17 +64,26 @@ class MainActivity : AppCompatActivity() {
             addJavascriptInterface(WebAppInterface(), "AndroidCRM")
         }
 
-        setContentView(webView)
+        rootLayout.addView(webView)
+        setContentView(rootLayout)
 
-        // Prevent content from overflowing into top status bar and camera notch / display cutout
-        ViewCompat.setOnApplyWindowInsetsListener(webView) { v, windowInsets ->
-            val insets = windowInsets.getInsets(
+        // Apply system window insets via layout margins to shift WebView strictly out of status bar, notch & nav bar
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { _, windowInsets ->
+            val statusBarInsets = windowInsets.getInsets(
                 WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout()
             )
-            v.setPadding(0, insets.top, 0, 0)
+            val navBarInsets = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars())
+
+            val params = webView.layoutParams as FrameLayout.LayoutParams
+            params.topMargin = statusBarInsets.top
+            params.bottomMargin = navBarInsets.bottom
+            params.leftMargin = statusBarInsets.left
+            params.rightMargin = statusBarInsets.right
+            webView.layoutParams = params
+
             windowInsets
         }
-        ViewCompat.requestApplyInsets(webView)
+        ViewCompat.requestApplyInsets(rootLayout)
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
