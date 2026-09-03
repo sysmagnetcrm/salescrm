@@ -120,7 +120,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        checkAndRequestAllFilesAccess()
         // Safety net fallback: active CallLog check and device CallLog sync on app resume/foregrounding
         try {
             com.academysales.crm.telecom.CallLogSyncService.syncRecentDeviceCallLogs(this)
@@ -134,21 +133,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkAndRequestAllFilesAccess() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            if (!android.os.Environment.isExternalStorageManager()) {
-                try {
-                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                        data = Uri.parse("package:$packageName")
-                    }
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                    startActivity(intent)
-                }
-            }
-        }
-    }
 
     private fun handleUrlNavigation(view: WebView?, url: String): Boolean {
         if (url.startsWith("tel:")) {
@@ -202,7 +186,7 @@ class MainActivity : AppCompatActivity() {
 
         @android.webkit.JavascriptInterface
         fun openAllFilesAccessSettings() {
-            checkAndRequestAllFilesAccess()
+            // MANAGE_EXTERNAL_STORAGE permission removed — no longer needed
         }
 
         @android.webkit.JavascriptInterface
