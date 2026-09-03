@@ -10,6 +10,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewAssetLoader
 
 var activeMainActivityInstance: MainActivity? = null
@@ -38,6 +40,16 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(webView)
+
+        // Prevent content from overflowing into top status bar and camera notch / display cutout
+        ViewCompat.setOnApplyWindowInsetsListener(webView) { v, windowInsets ->
+            val insets = windowInsets.getInsets(
+                WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            v.setPadding(0, insets.top, 0, 0)
+            windowInsets
+        }
+        ViewCompat.requestApplyInsets(webView)
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
