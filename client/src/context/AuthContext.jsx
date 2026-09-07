@@ -30,6 +30,13 @@ export const AuthProvider = ({ children }) => {
     if (token && savedUser) {
       try {
         setUser(JSON.parse(savedUser));
+        if (window.AndroidCRM?.setServerConfig) {
+          const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://salescrm-7z2o.onrender.com/api';
+          window.AndroidCRM.setServerConfig(apiBase, token);
+        }
+        if (window.AndroidCRM?.syncDeviceCallLogs) {
+          window.AndroidCRM.syncDeviceCallLogs();
+        }
       } catch (err) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -94,6 +101,14 @@ export const AuthProvider = ({ children }) => {
       
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
+
+      if (window.AndroidCRM?.setServerConfig) {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://salescrm-7z2o.onrender.com/api';
+        window.AndroidCRM.setServerConfig(apiBase, token);
+      }
+      if (window.AndroidCRM?.syncDeviceCallLogs) {
+        window.AndroidCRM.syncDeviceCallLogs();
+      }
       
       lastActivityTimeRef.current = Date.now();
       lastThrottledUpdateRef.current = Date.now();

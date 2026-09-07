@@ -831,14 +831,15 @@ export const syncDeviceLogs = async (req, res) => {
       const callDate = timestamp ? new Date(Number(timestamp)) : new Date();
       const status = Number(durationSeconds) > 0 ? 'completed' : 'no-answer';
 
-      // Deduplication check: same user within +/- 2 minutes
+      // Deduplication check: same user and same phone number within +/- 2 minutes of startedAt
       const timeWindowStart = new Date(callDate.getTime() - 120000);
       const timeWindowEnd = new Date(callDate.getTime() + 120000);
 
       const existingCall = await CallLog.findOne({
         where: {
           callerUserId: userId,
-          createdAt: { [Op.between]: [timeWindowStart, timeWindowEnd] }
+          phoneNumber: { [Op.like]: `%${sanitized}` },
+          startedAt: { [Op.between]: [timeWindowStart, timeWindowEnd] }
         }
       });
 

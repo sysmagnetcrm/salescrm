@@ -69,10 +69,20 @@ object CallLogSyncService {
                 
                 // Dispatch backfill list to server if token available
                 val prefs = context.getSharedPreferences("crm_prefs", Context.MODE_PRIVATE)
-                val baseUrl = CrmInCallService.serverBaseUrl.ifEmpty { prefs.getString("server_base_url", "") ?: "" }
-                val token = CrmInCallService.userAuthToken ?: prefs.getString("auth_token", null)
+                var baseUrl = CrmInCallService.serverBaseUrl
+                if (baseUrl.isEmpty() || baseUrl.contains("androidplatform.net")) {
+                    baseUrl = prefs.getString("server_base_url", "") ?: ""
+                }
+                if (baseUrl.isEmpty() || baseUrl.contains("androidplatform.net")) {
+                    baseUrl = com.academysales.crm.BuildConfig.API_BASE_URL
+                }
 
-                if (!baseUrl.isNullOrEmpty() && !token.isNullOrEmpty() && !baseUrl.contains("androidplatform.net")) {
+                var token = CrmInCallService.userAuthToken
+                if (token.isNullOrEmpty()) {
+                    token = prefs.getString("auth_token", null)
+                }
+
+                if (!baseUrl.isNullOrEmpty() && !token.isNullOrEmpty()) {
                     var cleanBaseUrl = baseUrl.trimEnd('/')
                     if (!cleanBaseUrl.endsWith("/api")) {
                         cleanBaseUrl = "$cleanBaseUrl/api"
@@ -84,7 +94,7 @@ object CallLogSyncService {
                     conn.requestMethod = "POST"
                     conn.setRequestProperty("Content-Type", "application/json")
                     conn.setRequestProperty("x-client-version", "1.2.0")
-                    conn.setRequestProperty("Authorization", "Bearer $token")
+                    conn.setRequestProperty("Authorization", if (token.startsWith("Bearer ")) token else "Bearer $token")
                     conn.doOutput = true
 
                     val jsonPayload = JSONObject()
@@ -98,6 +108,8 @@ object CallLogSyncService {
                     val code = conn.responseCode
                     Log.d(TAG, "[CallLogSync] POST /api/calls/sync-device-log -> HTTP $code (${callEntries.length()} logs synced)")
                     conn.disconnect()
+                } else {
+                    Log.w(TAG, "[CallLogSync] Skipped sync: baseUrl='$baseUrl', tokenMissing=${token.isNullOrEmpty()}")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "[CallLogSync] Error syncing device call logs: ${e.message}")

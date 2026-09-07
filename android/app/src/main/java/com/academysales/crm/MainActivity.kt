@@ -160,6 +160,23 @@ class MainActivity : AppCompatActivity() {
 
         com.academysales.crm.telecom.NativeCallMonitor.webViewRef = java.lang.ref.WeakReference(webView)
 
+        // Auto-request essential telecom and call log permissions on app start if not yet granted
+        val requiredPerms = mutableListOf(
+            android.Manifest.permission.CALL_PHONE,
+            android.Manifest.permission.READ_CALL_LOG,
+            android.Manifest.permission.WRITE_CALL_LOG,
+            android.Manifest.permission.READ_PHONE_STATE
+        )
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            requiredPerms.add("android.permission.POST_NOTIFICATIONS")
+        }
+        val missingPerms = requiredPerms.filter {
+            androidx.core.content.ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        if (missingPerms.isNotEmpty()) {
+            androidx.core.app.ActivityCompat.requestPermissions(this, missingPerms.toTypedArray(), 100)
+        }
+
         // Load offline bundled frontend via virtual secure origin
         webView.loadUrl("https://appassets.androidplatform.net/index.html")
     }
