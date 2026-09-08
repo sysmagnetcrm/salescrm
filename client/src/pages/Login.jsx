@@ -126,62 +126,70 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans text-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50/60 to-blue-50/40 flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans text-slate-900 selection:bg-sky-500 selection:text-white">
       
-      {/* Background Ambient Glow Accents (NO PNG image) */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-red-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-slate-900/50 rounded-full blur-3xl pointer-events-none" />
+      {/* Dynamic Background Ambient Light-Blue & Luxury White Glow Orbs */}
+      <div className="absolute -top-32 -left-32 w-[450px] h-[450px] bg-sky-300/30 rounded-full blur-3xl pointer-events-none animate-pulse" />
+      <div className="absolute -bottom-32 -right-32 w-[500px] h-[500px] bg-blue-400/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-sky-200/25 rounded-full blur-3xl pointer-events-none" />
+      
+      {/* Luxury Tactile SVG Grain Texture Overlay */}
+      <div 
+        className="absolute inset-0 opacity-[0.035] pointer-events-none mix-blend-multiply"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+        }}
+      />
 
-      {/* Main Glassmorphic Login Card */}
-      <div className="relative z-10 w-full max-w-md bg-slate-900/90 border border-slate-800/90 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6">
+      {/* Main Glassmorphic Luxury White Login Card */}
+      <div className="relative z-10 w-full max-w-md bg-white/85 border border-slate-200/80 backdrop-blur-2xl rounded-3xl shadow-[0_20px_50px_rgba(14,165,233,0.08),0_10px_25px_rgba(0,0,0,0.04)] p-6 sm:p-8 space-y-6 transition-all duration-300">
         
         {/* Branding & Logo Header */}
-        <div className="flex flex-col items-center text-center space-y-2">
-          <div className="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center p-2.5 shadow-md">
+        <div className="flex flex-col items-center text-center space-y-2.5">
+          <div className="w-16 h-16 rounded-2xl bg-white border border-sky-100 flex items-center justify-center p-2.5 shadow-md shadow-sky-500/10 ring-4 ring-sky-50/80 group transition-transform duration-300 hover:scale-105">
             <img src={logoUrl} alt={`${appName} Logo`} className="h-full w-full object-contain" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-white tracking-tight">{appName}</h1>
-            {location && <p className="text-xs font-bold text-red-400 mt-0.5">{location}</p>}
-            <p className="text-xs text-slate-400 mt-1 font-medium">Sign in to your sales workspace</p>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">{appName}</h1>
+            {location && <p className="text-xs font-bold text-sky-600 mt-0.5 tracking-wide">{location}</p>}
+            <p className="text-xs text-slate-500 mt-1 font-medium">Sign in to your sales workspace</p>
           </div>
         </div>
 
-        {/* Auth Mode Switcher Pills (Priority 1: Email & Password | Priority 2: Phone OTP) */}
-        <div className="flex items-center justify-center p-1 bg-slate-950/80 rounded-2xl border border-slate-800 text-xs font-bold">
+        {/* Auth Mode Switcher Pills (Email & Password | Phone & OTP) */}
+        <div className="flex items-center justify-center p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/80 text-xs font-bold">
           <button
             type="button"
             onClick={() => { setLoginMode('password'); setError(''); }}
-            className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
               loginMode === 'password'
-                ? 'bg-red-600 text-white shadow-md font-black'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white text-slate-900 shadow-md shadow-slate-200/60 ring-1 ring-slate-200/80 font-black'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
             }`}
           >
-            <Mail className="w-3.5 h-3.5" />
+            <Mail className={`w-3.5 h-3.5 ${loginMode === 'password' ? 'text-sky-600' : 'text-slate-400'}`} />
             <span>Email & Password</span>
           </button>
 
           <button
             type="button"
             onClick={() => { setLoginMode('otp'); setError(''); }}
-            className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
               loginMode === 'otp'
-                ? 'bg-red-600 text-white shadow-md font-black'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white text-slate-900 shadow-md shadow-slate-200/60 ring-1 ring-slate-200/80 font-black'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
             }`}
           >
-            <Phone className="w-3.5 h-3.5" />
+            <Phone className={`w-3.5 h-3.5 ${loginMode === 'otp' ? 'text-sky-600' : 'text-slate-400'}`} />
             <span>Phone & OTP</span>
           </button>
         </div>
 
         {/* Error Notification Alert */}
         {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-400 flex items-start gap-2 animate-in fade-in">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1 shrink-0" />
-            <span>{error}</span>
+          <div className="rounded-2xl border border-red-200 bg-red-50/80 p-3.5 text-xs font-semibold text-red-600 flex items-start gap-2.5 shadow-sm animate-in fade-in slide-in-from-top-1 duration-200">
+            <span className="w-2 h-2 rounded-full bg-red-500 mt-1 shrink-0 animate-ping" />
+            <span className="leading-relaxed">{error}</span>
           </div>
         )}
 
@@ -193,11 +201,11 @@ const Login = () => {
             
             {/* Email or Phone Field */}
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">
                 Email Address or Phone
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <div className="relative group">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-sky-600 transition-colors duration-200" />
                 <input
                   type="text"
                   required
@@ -206,7 +214,7 @@ const Login = () => {
                   placeholder="you@example.com or 9876543210"
                   inputMode="email"
                   autoComplete="username"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700/80 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50/80 border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all duration-200 shadow-inner shadow-slate-100/50"
                 />
               </div>
             </div>
@@ -214,19 +222,19 @@ const Login = () => {
             {/* Password Field */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">
                   Password
                 </label>
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-[11px] text-red-400 hover:text-red-300 font-bold transition-colors"
+                  className="text-[11px] text-sky-600 hover:text-sky-700 font-bold transition-colors"
                 >
                   {showPassword ? 'Hide Password' : 'Show Password'}
                 </button>
               </div>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <div className="relative group">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-sky-600 transition-colors duration-200" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
@@ -234,12 +242,12 @@ const Login = () => {
                   onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
                   placeholder="Enter your account password"
                   autoComplete="current-password"
-                  className="w-full pl-10 pr-10 py-3 bg-slate-800/80 border border-slate-700/80 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all"
+                  className="w-full pl-10 pr-10 py-3 bg-slate-50/80 border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all duration-200 shadow-inner shadow-slate-100/50"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -250,10 +258,10 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg hover:shadow-red-900/20 active:scale-98 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 hover:from-sky-600 hover:via-blue-700 hover:to-blue-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-sky-500/25 hover:shadow-sky-500/40 active:scale-[0.98] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2 group"
             >
               <span>{loading ? 'Signing in...' : 'Sign In'}</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-200" />
             </button>
           </form>
         )}
@@ -266,11 +274,11 @@ const Login = () => {
             
             {/* Phone Number Field */}
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">
                 Mobile Number
               </label>
-              <div className="relative">
-                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <div className="relative group">
+                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-sky-600 transition-colors duration-200" />
                 <input
                   type="tel"
                   required
@@ -279,32 +287,32 @@ const Login = () => {
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="10-digit mobile number"
                   inputMode="numeric"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700/80 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all disabled:opacity-60"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50/80 border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all duration-200 shadow-inner shadow-slate-100/50 disabled:opacity-60"
                 />
               </div>
             </div>
 
             {/* OTP Code Input Field (Shown after OTP request) */}
             {otpSent && (
-              <div className="space-y-1.5 animate-in fade-in">
+              <div className="space-y-1.5 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">
                     Verification OTP Code
                   </label>
                   {otpTimer > 0 ? (
-                    <span className="text-[10px] text-slate-400 font-bold">Resend in {otpTimer}s</span>
+                    <span className="text-[10px] text-slate-500 font-bold">Resend in {otpTimer}s</span>
                   ) : (
                     <button
                       type="button"
                       onClick={handleSendOtp}
-                      className="text-[11px] text-red-400 hover:text-red-300 font-bold transition-colors"
+                      className="text-[11px] text-sky-600 hover:text-sky-700 font-bold transition-colors"
                     >
                       Resend OTP
                     </button>
                   )}
                 </div>
-                <div className="relative">
-                  <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <div className="relative group">
+                  <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-sky-600 transition-colors duration-200" />
                   <input
                     type="text"
                     required
@@ -313,7 +321,7 @@ const Login = () => {
                     onChange={(e) => setOtpCode(e.target.value)}
                     placeholder="Enter 6-digit OTP code"
                     inputMode="numeric"
-                    className="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700/80 rounded-xl text-xs font-mono font-bold tracking-widest text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50/80 border border-slate-200/90 rounded-xl text-xs font-mono font-bold tracking-widest text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all duration-200 shadow-inner shadow-slate-100/50"
                   />
                 </div>
               </div>
@@ -323,18 +331,18 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg hover:shadow-red-900/20 active:scale-98 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 hover:from-sky-600 hover:via-blue-700 hover:to-blue-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-sky-500/25 hover:shadow-sky-500/40 active:scale-[0.98] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2 group"
             >
               <span>{loading ? 'Verifying...' : (otpSent ? 'Verify & Sign In' : 'Get OTP Code')}</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-200" />
             </button>
           </form>
         )}
 
         {/* Encrypted Session Footer Badge */}
-        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-center gap-1.5 text-[10px] font-semibold text-slate-400">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>256-Bit Encrypted CRM Session</span>
+        <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-2 text-[10px] font-bold text-slate-400 tracking-wide">
+          <ShieldCheck className="w-4 h-4 text-sky-500" />
+          <span>256-BIT ENCRYPTED CRM SESSION</span>
         </div>
       </div>
     </div>
@@ -342,3 +350,4 @@ const Login = () => {
 };
 
 export default Login;
+
